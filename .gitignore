@@ -3,6 +3,9 @@ node_modules
 out
 *.log
 
+# TypeScript 증분 빌드 산출물 — 매번 바뀌므로 추적하면 안 됨
+*.tsbuildinfo
+
 # API 키가 들어있는 파일 — 절대 커밋하지 않음
 # (README는 .env를, Next.js는 .env.local을 사용하므로 둘 다 무시)
 .env

@@ -46,7 +46,6 @@
 ## 미해결
 
 - [ ] `.env` vs `.env.local` 혼용 — `README.md`는 `.env`, Next.js는 `.env.local`을 쓴다
-- [ ] **git 미설치** — Chocolatey는 관리자 권한 필요, PortableGit 다운로드는 출처 승인이 필요해 대기 중 (D-009). 이러면 커밋 이력이 없어 전부 Markdown에 의존한다
 - [ ] `package-lock.json`에 `@anthropic-ai/sdk`가 남아 있음 — `npm install`로 정리
 - [ ] `next: ^16.3.8`인데 `eslint-config-next`는 `16.2.6`에 고정 — 불일치
 - [ ] 미사용 의존성 — `openai`는 import되지 않음. `react-markdown` / `remark-gfm`은 마크다운 렌더링 구현 시 사용
