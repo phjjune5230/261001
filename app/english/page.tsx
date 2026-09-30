@@ -7,6 +7,8 @@ import { DEFAULT_PROVIDER, defaultModelFor } from '@/lib/models'
 import { clearToken, getToken } from '@/lib/auth-client'
 import ModelPicker, { CUSTOM } from '@/components/ModelPicker'
 import SpeakButton from '@/components/SpeakButton'
+import ConversationList from '@/components/ConversationList'
+import { useConversations } from '@/hooks/useConversations'
 import {
   GOALS,
   LEVELS,
@@ -19,6 +21,29 @@ import {
 type Entry =
   | { kind: 'user'; text: string }
   | { kind: 'assistant'; turn: LessonTurn }
+
+/**
+ * DB에서 꺼낸 메시지를 다시 Entry로 되돌립니다.
+ *
+ * 왜 이것이 필요한가:
+ * 영어 턴은 content(튜터 설명) + steps(예문·연습) 구조입니다. 예문을
+ * content 문자열로 펴서 저장했다가 열면 **예문과 번역이 섞인 한 덩어리**가 되고,
+ * 말풍선·🔊 버튼·단계 배지를 그릴 수 없습니다.
+ *
+ * 그래서 턴은 meta에 통째로 넣고, 여기서 그대로 되돌립니다 (D-016).
+ * 저장이 없을 때를 위해 턴이 아니면 빈 턴으로 떨어뜨립니다 —
+ * 깨진 값을 화면에 흘려보내지 않기 위한 의도적 방어입니다.
+ */
+function metaToTurn(meta: Record<string, unknown> | null, fallback: string): LessonTurn {
+  if (meta && typeof meta.phase === 'string') {
+    return {
+      phase: meta.phase as LessonTurn['phase'],
+      content: typeof meta.content === 'string' ? meta.content : fallback,
+      steps: Array.isArray(meta.steps) ? (meta.steps as LessonStep[]) : [],
+    }
+  }
+  return { phase: 'intro', content: fallback, steps: [] }
+}
 
 export default function EnglishPage() {
   const [provider, setProvider] = useState<Provider>(DEFAULT_PROVIDER)
@@ -33,6 +58,23 @@ export default function EnglishPage() {
   // 채팅과 같다. provider 원본 오류가 AI 말처럼 보이던 것을 분리한다.
   const [error, setError] = useState<string>('')
   const [phase, setPhase] = useState<LessonTurn['phase'] | null>(null)
+  // 채팅과 같다 — 저장이 실패했을 때만 경고합니다.
+  const [saveWarning, setSaveWarning] = useState<string>('')
+
+  const {
+    enabled: savingEnabled,
+    conversations,
+    activeId,
+    loadingList,
+    newConversation,
+    openConversation,
+    removeConversation,
+    saveTurn,
+  } = useConversations('english')
+
+  /** DB의 평문 content는 히스토리 텍스트로 압축됩니다 (D-016) */
+  const metaToHistoryText = (meta: Record<string, unknown> | null, fallback: string) =>
+    turnToHistoryText(metaToTurn(meta, fallback))
 
   const bottomRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -111,6 +153,11 @@ export default function EnglishPage() {
 
       setPhase(turn.phase)
       setEntries([...withUser, { kind: 'assistant', turn }])
+
+      // 턴을 통째로 meta에 넣습니다. content엔 히스토리 텍스트를 — 화면에는
+      // turn.steps로 렌더하고, 모델에게는 압축된 형태로 보냅니다.
+      const saved = await saveTurn(text, metaToHistoryText(turn as unknown as Record<string, unknown>, ''), turn as unknown as Record<string, unknown>)
+      setSaveWarning(saved ? '' : '이 세션은 저장되지 않았습니다. Supabase 연결을 확인하세요.')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.')
     } finally {
@@ -118,10 +165,27 @@ export default function EnglishPage() {
     }
   }
 
-  const startOver = () => {
+  const handleSelectConversation = async (id: string) => {
+    const rows = await openConversation(id)
+    const restored: Entry[] = rows.map((r) =>
+      r.role === 'user'
+        ? { kind: 'user', text: r.content }
+        : { kind: 'assistant', turn: metaToTurn(r.meta, r.content) }
+    )
+    setEntries(restored)
+    // 헤더 배지는 마지막 튜터 턴의 단계로 되살립니다.
+    const last = [...restored].reverse().find((e) => e.kind === 'assistant')
+    setPhase(last && last.kind === 'assistant' ? last.turn.phase : null)
+    setError('')
+    setSaveWarning('')
+  }
+
+  const startOver = async () => {
+    await newConversation()
     setEntries([])
     setPhase(null)
     setError('')
+    setSaveWarning('')
   }
 
   return (
@@ -149,7 +213,7 @@ export default function EnglishPage() {
           </span>
           <button
             type="button"
-            onClick={startOver}
+            onClick={() => void startOver()}
             disabled={entries.length === 0}
             className="border border-[#222] px-3 py-1.5 rounded text-[#666] hover:border-[#444] hover:text-[#888] disabled:opacity-40 disabled:hover:border-[#222] disabled:hover:text-[#666] transition-colors"
           >
@@ -199,6 +263,17 @@ export default function EnglishPage() {
           </div>
 
           <div className="border-t border-[#222] pt-6 flex flex-col gap-6">
+            <ConversationList
+              conversations={conversations}
+              activeId={activeId}
+              enabled={savingEnabled}
+              loading={loadingList}
+              onSelect={(id) => void handleSelectConversation(id)}
+              onNew={() => void startOver()}
+              onDelete={(id) => void removeConversation(id)}
+              emptyHint="저장된 세션이 없습니다. 첫 발화를 보내면 만들어집니다."
+            />
+
             <ModelPicker
               provider={provider}
               onProviderChange={handleProviderChange}
@@ -212,6 +287,12 @@ export default function EnglishPage() {
 
         <section className="flex-1 flex flex-col h-[calc(100vh-65px)] md:h-auto">
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            {saveWarning && (
+              <div className="text-[11px] text-[#ef8888] border border-[#ef4444]/40 bg-[#ef4444]/5 rounded px-3 py-2">
+                {saveWarning}
+              </div>
+            )}
+
             {entries.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center text-[#555] text-sm">
                 <p>수준과 목표를 고른 뒤 시작하세요.</p>

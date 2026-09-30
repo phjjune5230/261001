@@ -55,9 +55,13 @@ C:\june\first_app\
 │       └── english/
 │           └── route.ts           # POST — 영어 학습 (토큰 필수, jsonMode)
 ├── components/
-│   ├── AuthGate.tsx               # 'use client' — 6자리 PIN 잠금 화면
+│   ├── AuthGate.tsx               # 'use client' — PIN 잠금 + 로그인 요구
+│   ├── SignInForm.tsx             # 'use client' — Supabase 로그인/가입
 │   ├── ModelPicker.tsx            # 'use client' — 채팅·영어가 공유하는 모델 선택
+│   ├── ConversationList.tsx       # 'use client' — 대화 목록 (두 화면 공유)
 │   └── SpeakButton.tsx            # 'use client' — Web Speech 발음 (D-017)
+├── hooks/
+│   └── useConversations.ts        # 'use client' — 대화 목록·저장 (두 화면 공유)
 ├── lib/
 │   ├── llm.ts                     # 멀티 provider LLM 콜러 (callLLM)
 │   ├── models.ts                  # ★ 모델 설정 단일 출처
@@ -65,7 +69,10 @@ C:\june\first_app\
 │   ├── auth-client.ts             # 클라이언트 전용 — sessionStorage 토큰
 │   ├── api.ts                     # 라우트 공통 — 인증 검사 + 에러 봉쇄
 │   ├── context.ts                 # ★ 컨텍스트 예산 관리 (keepRecentMessages)
+│   ├── db.ts                      # ★ Supabase — 로그인 + 대화 저장 (D-018, D-019)
 │   └── lesson.ts                  # 영어 세션 계약 — 타입·프롬프트·파서
+├── supabase/
+│   └── schema.sql                 # ★ 테이블 + RLS 정책 (직접 실행 대상)
 ├── .env.example                   # 환경 변수 템플릿
 ├── .gitignore
 ├── next.config.ts
@@ -116,3 +123,34 @@ effect에서 `setState`를 불러 연속 렌더가 발생하기 때문입니다 
 단, 이 방식은 보호된 페이지 HTML을 인증 없이도 전송합니다.
 **API(`/api/chat`)는 서버에서 검사하므로 실제로 보호해야 하는 대상은 막혀 있습니다.**
 더 강한 게이트가 필요해지면 Next 16의 `proxy.ts`로 옮깁니다 — D-007의 대안 기각 참고.
+
+### 잠금이 두 겹인 이유 (D-019)
+
+`AuthGate`는 두 가지를 순서대로 요구합니다. **둘의 목적이 다릅니다.**
+
+| 단계 | 막는 것 | 우회하면 |
+|------|---------|----------|
+| 6자리 PIN | 화면 접근 | HTML은 전송됨, 크레딧 소모 가능 |
+| Supabase 로그인 | 대화가 섞이는 것 | RLS가 DB 레벨에서 막음 |
+
+PIN을 없애면 `/api/chat`을 토큰 없이 부를 수 있어 **provider 크레딧**을
+누가 태울 수 있습니다. 로그인을 없애면 대화가 사람마다 섞입니다.
+
+**Supabase가 미설정이면 로그인을 요구하지 않습니다** — 채팅 기능 하나 때문에
+앱 전체를 못 쓰게 되는 게 더 나쁘기 때문입니다. 이때 저장은 꺼지고 대화 기능은
+그대로 동작합니다.
+
+### 브라우저가 Supabase에 직접 붙는 이유 (D-019)
+
+대화 저장은 **우리 API 라우트를 거치지 않습니다.** 브라우저가 anon 키로
+Supabase에 직접 붙습니다.
+
+이유는 보안 경계를 서버가 아니라 **Postgres(RLS)**에 두기 위해서입니다.
+우리 서버를 거치려면 `service_role` 키가 필요하는데, 이 키는 RLS를
+**완전히 우회**합니다 — 애플리케이션 실수 하나가 곧 전 데이터 유출이 됩니다.
+
+직접 붙이면 anon role로만 동작하므로 RLS가 끝까지 살아 있고,
+**우회 키가 우리 코드 어디에도 존재하지 않습니다.**
+
+LLM 호출만 예외입니다 — provider 키가 서버에만 있어야 하므로
+`/api/*`는 반드시 우리 서버를 거칩니다.

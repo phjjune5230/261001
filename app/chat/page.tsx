@@ -6,6 +6,8 @@ import type { Provider } from '@/lib/llm'
 import { DEFAULT_PROVIDER, defaultModelFor } from '@/lib/models'
 import { clearToken, getToken } from '@/lib/auth-client'
 import ModelPicker, { CUSTOM } from '@/components/ModelPicker'
+import ConversationList from '@/components/ConversationList'
+import { useConversations } from '@/hooks/useConversations'
 
 type Message = {
   role: 'user' | 'assistant'
@@ -24,6 +26,19 @@ export default function ChatPage() {
   const [error, setError] = useState<string>('')
   // 서버가 컨텍스트 예산 때문에 버린 메시지 수. 숨기면 사용자가 모른다 (D-014).
   const [trimmedNotice, setTrimmedNotice] = useState<string>('')
+  // 저장이 실패했을 때만 경고합니다. 성공은 조용합니다.
+  const [saveWarning, setSaveWarning] = useState<string>('')
+
+  const {
+    enabled: savingEnabled,
+    conversations,
+    activeId,
+    loadingList,
+    newConversation,
+    openConversation,
+    removeConversation,
+    saveTurn,
+  } = useConversations('chat')
 
   // 새 메시지가 생길 때마다 하단으로. 긴 대화에서 답이 화면 밖에 생기는 것을 막는다.
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -37,6 +52,29 @@ export default function ChatPage() {
   const handleProviderChange = (newProvider: Provider) => {
     setProvider(newProvider)
     setModel(defaultModelFor(newProvider))
+  }
+
+  /** 목록에서 대화를 고릅니다. 이전 대화의 provider·model도 되살립니다. */
+  const handleSelectConversation = async (id: string) => {
+    const rows = await openConversation(id)
+    setMessages(rows.map((r) => ({ role: r.role, content: r.content })))
+    setTrimmedNotice('')
+    setError('')
+
+    const convo = conversations.find((c) => c.id === id)
+    if (convo?.provider && convo?.model) {
+      const p = convo.provider as Provider
+      setProvider(p)
+      setModel(convo.model)
+    }
+  }
+
+  const handleNewConversation = async () => {
+    await newConversation()
+    setMessages([])
+    setTrimmedNotice('')
+    setError('')
+    setSaveWarning('')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,6 +123,10 @@ export default function ChatPage() {
 
       setMessages([...nextMessages, { role: 'assistant', content: data.content }])
 
+      // 화면에 먼저 찍고 저장은 그다음. 저장이 느려도 대화가 멈추지 않습니다.
+      const saved = await saveTurn(userMessage.content, data.content)
+      setSaveWarning(saved ? '' : '이 대화는 저장되지 않았습니다. Supabase 연결을 확인하세요.')
+
       // 버린 게 있을 때만 알려준다. 매번 말을 걸면 노이즈가 된다.
       if (typeof data.droppedMessages === 'number' && data.droppedMessages > 0) {
         setTrimmedNotice(
@@ -124,6 +166,17 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto">
         {/* Sidebar Controls */}
         <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-[#222] p-6 flex flex-col gap-6">
+          <ConversationList
+            conversations={conversations}
+            activeId={activeId}
+            enabled={savingEnabled}
+            loading={loadingList}
+            onSelect={(id) => void handleSelectConversation(id)}
+            onNew={() => void handleNewConversation()}
+            onDelete={(id) => void removeConversation(id)}
+            emptyHint="저장된 대화가 없습니다. 첫 메시지를 보내면 만들어집니다."
+          />
+
           <ModelPicker
             provider={provider}
             onProviderChange={handleProviderChange}
@@ -151,6 +204,12 @@ export default function ChatPage() {
             {trimmedNotice && (
               <div className="text-[11px] text-[#666] border border-[#222] rounded px-3 py-2 bg-[#151515]">
                 {trimmedNotice}
+              </div>
+            )}
+
+            {saveWarning && (
+              <div className="text-[11px] text-[#ef8888] border border-[#ef4444]/40 bg-[#ef4444]/5 rounded px-3 py-2">
+                {saveWarning}
               </div>
             )}
 

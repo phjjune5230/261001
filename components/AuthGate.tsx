@@ -2,6 +2,13 @@
 
 import { useState, useSyncExternalStore } from 'react'
 import { getToken, saveToken, subscribeToken } from '@/lib/auth-client'
+import {
+  getAuthSnapshot,
+  getServerAuthSnapshot,
+  isSupabaseConfigured,
+  subscribeAuth,
+} from '@/lib/db'
+import SignInForm from '@/components/SignInForm'
 
 /**
  * ============================================================================
@@ -23,6 +30,26 @@ import { getToken, saveToken, subscribeToken } from '@/lib/auth-client'
  *  보안 수준 (사용자 결정 — docs/08-decisions.md D-007):
  *    의도적으로 약하게 만들었습니다. "URL만 알면 끝"인 상태를 막는 것이 목적이며,
  *    토큰이 sessionStorage에 있으므로 개발자도구로 볼 수 있습니다.
+ *
+ *  ─────────────────────────────────────────────────────────────────────────
+ *  PIN 잠금 + 계정 로그인 (D-019)
+ *  ─────────────────────────────────────────────────────────────────────────
+ *  둘이 붙어 있지만 목적이 다릅니다.
+ *
+ *    PIN       — 앱 문. URL만 아는 사람에게 화면을 안 보여줍니다
+ *    로그인    — "이 대화가 누구 것인가". 대화를 사람마다 나눠줍니다
+ *
+ *  PIN을 없애면 안 됩니다. 잠금이 내려가면 /api/chat을 토큰 없이 그대로
+ *  부를 수 있어서, 앱을 열지 않고 curl 한 줄로 provider 크레딧을 태웁니다.
+ *
+ *  반대로 로그인을 없애면 안 됩니다. 로그인 없이는 RLS의 auth.uid()가
+ *  null이 되고, 아무도 아무 대화를 못 봅니다 — 또 아무 말도 못 듣습니다.
+ *
+ *  ★ Supabase가 미설정이면 로그인 화면을 띄우지 않고 앱을 그대로 엽니다. ★
+ *  설정이 안 된 상태에서 전부 막아버리면, 채팅 기능 하나 때문에 앱을 못 쓰는
+ *  일이 생깁니다. 이때는 저장이 안 될 뿐 대화 기능 자체는 그대로 동작합니다.
+ *  반대로 "설정은 됐는데 로그인 안 한" 상태는 막습니다 — 이때 열면
+ *  누구의 대화인지 구분이 안 되는 화면을 보여주게 됩니다.
  */
 function LockScreen() {
   const [pin, setPin] = useState<string>('')
@@ -110,11 +137,24 @@ function LockScreen() {
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const token = useSyncExternalStore(subscribeToken, getToken, () => null)
+  const auth = useSyncExternalStore(subscribeAuth, getAuthSnapshot, getServerAuthSnapshot)
+
+  // PIN이 걸렸으면 Supabase 상태와 무관하게 잠금 화면이 우선입니다.
+  const pinned = token !== null
+
+  // 로그인이 필요한 조건: Supabase가 설정돼 있고, 세션 로딩이 끝났는데 로그인 안 됨.
+  // ready가 false일 때는 기다립니다 — 이때 미리 띄우면 깜빡입니다.
+  const needAccount = pinned && isSupabaseConfigured() && auth.ready && auth.user === null
 
   return (
     <>
       {children}
-      {token === null && <LockScreen />}
+      {pinned && needAccount && (
+        <div className="fixed inset-0 z-40 bg-[#0f0f0f] text-white flex flex-col items-center justify-center px-6">
+          <SignInForm user={null} />
+        </div>
+      )}
+      {!pinned && <LockScreen />}
     </>
   )
 }
