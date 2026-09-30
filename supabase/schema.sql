@@ -37,12 +37,16 @@ create table if not exists public.conversations (
   model       text,
 
   created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now(),
-
-  -- 대화 목록은 "이 사람의 것만, 최신순"으로 조회합니다.
-  -- 인덱스가 없으면 대화가 쌓일 때 목록 조회가 느려집니다.
-  index conversations_owner_idx on public.conversations (user_id, updated_at desc)
+  updated_at  timestamptz not null default now()
 );
+
+-- 인덱스는 create table과 별개의 명령입니다. Postgres에는
+-- create table 안에 인덱스를 인라인으로 선언하는 문법이 없습니다.
+--
+-- 대화 목록은 "이 사람의 것만, 최신순"으로 조회합니다.
+-- 인덱스가 없으면 대화가 쌓일 때 목록 조회가 느려집니다.
+create index if not exists conversations_owner_idx
+  on public.conversations (user_id, updated_at desc);
 
 -- ─────────────────────────────────────────────────────────────────────────
 --  RLS — 이것이 접근 통제 전부입니다
@@ -50,6 +54,14 @@ create table if not exists public.conversations (
 --  auth.uid()는 현재 로그인한 사용자 ID를 Postgres가 넣어주는 함수입니다.
 --  클라이언트가 이걸 조작할 수는 없습니다 (JWT 서명 검증이 DB에서 이뤄짐).
 alter table public.conversations enable row level security;
+
+-- 이 스크립트는 여러 번 실행해도 됩니다.
+-- create table에는 if not exists가 있지만 create policy에는 없고,
+-- 정책이 이미 있으면 "already exists"로 실패하기 때문입니다.
+drop policy if exists "conversations_select_own"   on public.conversations;
+drop policy if exists "conversations_insert_own"   on public.conversations;
+drop policy if exists "conversations_update_own"   on public.conversations;
+drop policy if exists "conversations_delete_own"   on public.conversations;
 
 create policy "conversations_select_own"
   on public.conversations for select
@@ -113,12 +125,18 @@ create table if not exists public.messages (
   -- 펼치지 않고 원형으로 넣습니다 (D-016의 turn을 그대로 보존).
   meta            jsonb,
 
-  created_at      timestamptz not null default now(),
-
-  index messages_conversation_idx on public.messages (conversation_id, created_at)
+  created_at      timestamptz not null default now()
 );
 
+-- 한 대화의 메시지를 시간순으로 읽는 쿼리. 대화 열 때 매번 씁니다.
+create index if not exists messages_conversation_idx
+  on public.messages (conversation_id, created_at);
+
 alter table public.messages enable row level security;
+
+drop policy if exists "messages_select_own" on public.messages;
+drop policy if exists "messages_insert_own" on public.messages;
+drop policy if exists "messages_delete_own" on public.messages;
 
 create policy "messages_select_own"
   on public.messages for select
@@ -151,8 +169,11 @@ begin
   update public.conversations c
      set updated_at = now(),
          -- 첫 메시지가 들어온 순간에만 제목을 정합니다.
+         -- 공백뿐인 메시지는 제목을 빈 문자열로 만들지 않고 그대로 둡니다.
          title = case
-                   when c.title = '새 대화' and new.role = 'user'
+                   when c.title = '새 대화'
+                    and new.role = 'user'
+                    and btrim(new.content) <> ''
                    then left(btrim(new.content), 30) || case
                           when length(btrim(new.content)) > 30 then '…' else '' end
                    else c.title
