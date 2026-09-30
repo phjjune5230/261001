@@ -31,14 +31,28 @@
 - [ ] 발음 속도 조절 (0.8x / 1.25x)
 - [ ] 틀린 문장 누적 — 세션이 끝났을 때 "평소 착각하는 표현"을 보여줄 것
 
-## Phase 3: 개인 비서 (목표 관리)
+## Phase 3: 배포 + 대화 영속화 (진행 중 — v0.4.0)
+
+URL로 어디서나 접속하게 만들고, 대화를 잃지 않게 한다.
+사용자 결정: **일부 사람에게 공유**, 각자 대화는 따로.
+
+- [x] 스키마 설계 — `supabase/schema.sql` (conversations + messages + RLS)
+- [x] 설계 문서 — D-018 (저장), D-019 (인증), D-020 (배포)
+- [ ] **사용자 조치** — supabase.com 프로젝트 생성 후 SQL 에디터에서 스키마 실행
+- [ ] **사용자 조치** — GitHub 저장소 생성 후 push (현재 remote 없음)
+- [ ] **사용자 조치** — Vercel 연동 + 환경 변수 7개 등록
+- [ ] 로그인 화면 (Supabase Auth)
+- [ ] 대화 목록 + 이어하기/삭제 — 채팅·영어 양쪽
+- [ ] `lib/db.ts` — Supabase 클라이언트 생성 (브라우저/서버 공용)
+- [ ] 배포 후 provider TPM 확인 — Vercel 리전에서 한도가 다를 수 있음 (D-020)
+
+## Phase 4: 개인 비서 (목표 관리)
 
 - [ ] 목표 추가/수정/조회 (`/assistant`)
 - [ ] Function Calling 연동 (목표 자동 추가)
-- [ ] Supabase 연동
-- [ ] 대화 기록 영속화 — 현재는 새로고침하면 사라짐
+- [ ] 사용자 관리 화면 — 사람 수가 늘면 비밀번호 재설정·공유 해제가 필요 (D-019)
 
-## Phase 4: 확장 기능
+## Phase 5: 확장 기능
 
 - [ ] 웹 검색 (Tavily 등)
 - [ ] 주식 정보 및 티커 크롤러
@@ -46,7 +60,5 @@
 ## 미해결
 
 - [ ] `.env` vs `.env.local` 혼용 — `README.md`는 `.env`, Next.js는 `.env.local`을 쓴다
-- [ ] `package-lock.json`에 `@anthropic-ai/sdk`가 남아 있음 — `npm install`로 정리
 - [ ] `next: ^16.3.8`인데 `eslint-config-next`는 `16.2.6`에 고정 — 불일치
 - [ ] 미사용 의존성 — `openai`는 import되지 않음. `react-markdown` / `remark-gfm`은 마크다운 렌더링 구현 시 사용
-- [ ] Vercel 배포 시 환경 변수 5개(`APP_PIN`, `APP_TOKEN`, 3개 provider 키)를 수동 등록해야 함 — 빠지면 fail-closed로 앱이 잠겨 보인다
