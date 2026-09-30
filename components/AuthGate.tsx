@@ -1,0 +1,120 @@
+'use client'
+
+import { useState, useSyncExternalStore } from 'react'
+import { getToken, saveToken, subscribeToken } from '@/lib/auth-client'
+
+/**
+ * ============================================================================
+ *  잠금 화면 (6자리 PIN)
+ * ============================================================================
+ *
+ *  왜 layout.tsx 안이 아니라 컴포넌트로 분리했는가:
+ *    layout.tsx는 서버 컴포넌트로 유지하고 싶습니다. 여기에 'use client'를 붙이면
+ *    하위 트리 전체가 클라이언트 렌더링으로 바뀌기 때문입니다.
+ *    서버 컴포넌트가 클라이언트 컴포넌트에 children을 넘기는 정식 패턴을 씁니다.
+ *
+ *  왜 자식은 항상 렌더하고 잠금 화면만 덮는가:
+ *    토큰 확인 전까지 렌더를 미루면 첫 페인트에 빈 화면이 보이거나,
+ *    effect에서 setState를 불러 연속 렌더가 발생합니다.
+ *    sessionStorage 방식에서는 페이지 HTML이 어차피 이미 전송되므로
+ *    "보호된 내용을 그리지 않는다"는 이득이 없고, 깜빡임만 남습니다.
+ *    잠금 화면을 fixed 오버레이로 덮어 flickering을 없앴습니다.
+ *
+ *  보안 수준 (사용자 결정 — docs/08-decisions.md D-007):
+ *    의도적으로 약하게 만들었습니다. "URL만 알면 끝"인 상태를 막는 것이 목적이며,
+ *    토큰이 sessionStorage에 있으므로 개발자도구로 볼 수 있습니다.
+ */
+function LockScreen() {
+  const [pin, setPin] = useState<string>('')
+  const [error, setError] = useState<string>('')
+  const [busy, setBusy] = useState<boolean>(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (busy || pin.length !== 6) return
+
+    setError('')
+    setBusy(true)
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || '인증에 실패했습니다.')
+        setPin('')
+        return
+      }
+
+      // saveToken이 저장소를 갱신하면 구독자가 알아서 오버레이를 내린다
+      saveToken(data.token)
+    } catch {
+      setError('서버에 연결할 수 없습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#0f0f0f] text-white flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-sm">
+        <h1
+          style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700 }}
+          className="text-3xl tracking-tight"
+        >
+          First App
+        </h1>
+        <p className="text-xs text-[#444] mt-1 mb-8">잠금 해제</p>
+
+        <form onSubmit={handleSubmit}>
+          <input
+            type="password"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={pin}
+            onChange={(e) => {
+              setError('')
+              setPin(e.target.value.replace(/\D/g, '').slice(0, 6))
+            }}
+            placeholder="6자리"
+            autoFocus
+            aria-label="6자리 PIN"
+            className={`w-full bg-[#151515] border rounded-lg px-4 py-4 text-center text-2xl tracking-[0.5em] pl-[0.9em] text-white outline-none transition-colors ${
+              error ? 'border-[#ef4444]' : 'border-[#222] focus:border-[#e8ff47]'
+            }`}
+          />
+
+          {error && <p className="mt-3 text-xs text-[#ef4444] text-center">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={pin.length !== 6 || busy}
+            className="mt-4 w-full bg-[#e8ff47] text-black font-semibold px-6 py-3 rounded-lg text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            {busy ? '확인 중...' : '잠금 해제'}
+          </button>
+        </form>
+
+        <p className="mt-8 text-[10px] text-[#444] text-center leading-relaxed">
+          계속할 수 없다면 서버의 <span className="text-[#555]">.env.local</span>에서
+          <br />
+          <span className="text-[#555]">APP_PIN</span> 값을 확인하세요.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export default function AuthGate({ children }: { children: React.ReactNode }) {
+  const token = useSyncExternalStore(subscribeToken, getToken, () => null)
+
+  return (
+    <>
+      {children}
+      {token === null && <LockScreen />}
+    </>
+  )
+}

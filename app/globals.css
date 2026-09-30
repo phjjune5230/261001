@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+body {
+  font-family: var(--font-dm-mono), monospace;
+}
+
+/* 제목용 디스플레이 폰트 (Syne) */
+.font-display {
+  font-family: var(--font-syne), sans-serif;
+  font-weight: 700;
+}

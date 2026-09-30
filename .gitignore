@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+*.log
+
+# API 키가 들어있는 파일 — 절대 커밋하지 않음
+# (README는 .env를, Next.js는 .env.local을 사용하므로 둘 다 무시)
+.env
+.env.local
+.env.*.local
