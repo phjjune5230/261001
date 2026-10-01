@@ -261,10 +261,10 @@ Request too large ... on tokens per minute (TPM): Limit 8000, Requested 46197
 
 - **기록일**: 2026-10-01
 - **상황**: "어디서나 URL로 접속" 요구가 들어왔고, 검토된 적이 없었다.
-- **결정**: Vercel Hobby 플랜. 환경 변수는 7개(`APP_PIN`, `APP_TOKEN`, provider 키 3개, Supabase URL, Supabase anon key)를 Vercel 대시보드에 등록한다.
+- **결정**: Vercel Hobby 플랜. 환경 변수는 7개(`APP_PIN`, `APP_TOKEN`, provider 키 3개, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`)를 Vercel 대시보드에 등록한다. **모두 `NEXT_PUBLIC_` 접두사 없이.** (D-022에서 anon 키가 `service_role`로 교체됨)
 - **근거**: Next.js를 만든 곳이라 설정이 0이고, GitHub 연동이 기본 제공된다. Hobby 티어의 대역폭(100GB)으로 개인 사용은 충분하다.
 - **대안 기각**: *Netlify* — Next.js App Router 지원이 약하다. *Cloudflare Pages* — 싸지만 Next.js SSR 셋업이 성가시다. *Railway/Render* — 서버를 직접 운영해야 해 관리 비용이 발생한다. *집 PC 직접* — 공인 IP·포트 개방이 필요하고 집 주소를 노출하게 된다.
-- **보안 (기재)**: **환경 변수 값은 사용자가 직접 등록하며 에이전트를 거치지 않는다.** Supabase anon key와 provider 키가 대화 기록에 불필요하게 노출될 수 있습니다. 익명 key가 anon role로 쓰이는 이상은 보안 경계가 RLS에 의존하는 설계이므로, **키를 최소화하기보다 RLS를 테스트하는 쪽을 우선**합니다.
+- **보안 (기재)**: **환경 변수 값은 사용자가 직접 등록하며 에이전트를 거치지 않는다.** Supabase 키와 provider 키가 대화 기록에 불필요하게 노출될 수 있습니다. D-022 이후 보안 경계는 RLS가 아니라 **우리 서버의 `x-app-token` 검사 하나**입니다. `SUPABASE_SERVICE_ROLE_KEY`에는 접두사를 절대 붙이지 마세요 — 붙는 순간 RLS 우회 키가 JS 번들에 평문으로 실립니다.
 - **남는 위험**: Hobby 플랜의 **함수 메모리 512MB 제한**, 그리고 Vercel 리전에서의 provider **TPM 한도**는 로컬과 다를 수 있습니다. 배포 후 첫 호출에서 확인이 필요합니다.
 
 

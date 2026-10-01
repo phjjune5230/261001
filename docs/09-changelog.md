@@ -56,11 +56,28 @@ D-019가 짠 정책 7개는 전부 `auth.uid()`를 봅니다. 로그인이 없�
 - [x] `npx tsc --noEmit` — 통과
 - [x] `npm run lint` — 통과 (경고 0)
 - [x] `npm run build` — 통과. 라우트 3개 등록 확인
-- [ ] `supabase/schema.sql` 실행 (사용자)
-- [ ] `supabase/single-user.sql` 실행 (사용자)
-- [ ] 정책 0개 확인 / RLS 켜짐 확인 / anon 조회 0 (사용자)
-- [ ] 대화 저장 → 새 브라우저에서 목록 보임
+- [x] `supabase/schema.sql` 실행 (사용자)
+- [x] `supabase/single-user.sql` 실행 (사용자)
+- [x] 정책 0개 / RLS 켜짐(`public`의 두 테이블) / anon 조회 0 (사용자)
+- [x] 대화 5개 라우트 전부 토큰 없으면 401 (GET·POST·PATCH·DELETE·메시지)
+- [x] 대화 저장 → 목록에 남고 새로고침해도 살아있음 (사용자, 2026-10-01)
 - [ ] Vercel 배포 후 `/api/chat`의 TPM 한도 확인 (D-020)
+
+> 저장 확인은 **같은 브라우저**에서 했습니다. 토큰은 `sessionStorage`에 있으므로
+> 다른 브라우저에서 보면 잠금 화면이 나오는 게 맞고, 대화가 보이면 그건 우회가
+> 아니라 정상입니다. 별도 창·시크릿 모드에서의 확인은 하지 않았습니다.
+
+### 저장이 안 될 때 조용히 넘어가지 않는다 (설정 실수)
+
+`SUPABASE_SERVICE_ROLE_KEY`가 없으면 라우트는 **503**을 냅니다. 그리고
+`useConversations`는 그걸 "저장 안 됨"으로 바꿔 목록 UI만 숨깁니다.
+앱은 정상 작동하고 대화도 되므로 **눈에 띄는 실패가 없습니다.**
+
+v0.4.0 때 넣은 `NEXT_PUBLIC_SUPABASE_ANON_KEY`를 그대로 두고 있었다면
+이 상태가 됩니다. 실제로 그렇게 빠졌고, 목록이 안 보인다는 제보로 알게 됐습니다.
+`SUPABASE_URL`은 예전 이름(`NEXT_PUBLIC_SUPABASE_URL`)도 받아주지만
+`SUPABASE_SERVICE_ROLE_KEY`에는 fallback이 없습니다 — 실수로 anon 키를 넣으면
+RLS에 막혀 조용히 0건이 옵니다.
 
 ### 사용자가 직접 해야 하는 것
 
