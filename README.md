@@ -1,81 +1,77 @@
-# First App — June's Personal AI Assistant
+# First App
 
-> 개인 실 사용을 위한 AI 어시스턴트. Phase 1은 멀티 provider 채팅입니다.
-> 이전 스터디 프로젝트(`C:\june\old`)는 **컨셉만** 참조하며 코드는 이식하지 않습니다.
+개인 실 사용 AI 어시스턴트. provider를 직접 골라 쓰고, 대화는 어디서든 이어갑니다.
 
-## 이 프로젝트는 무엇인가?
+- **채팅** — `/chat`
+- **영어 학습** — `/english`
+- **운영 중** — https://261001-zeta.vercel.app (push 하면 자동 배포)
 
-사용자가 직접 LLM provider(OpenRouter, Groq, Gemini)를 선택하고,
-각각의 API 키를 등록하여 다양한 AI 기능을 사용할 수 있는 웹 앱입니다.
+> 이전 프로젝트 `C:\june\old`는 **컨셉만** 참고했고 코드는 가져오지 않았습니다.
 
-현재 기능 (v0.3.0)
+---
 
-| 화면 | 경로 | 하는 일 |
-|------|------|---------|
-| 채팅 | `/chat` | 3개 provider를 고르고 자유롭게 대화. 긴 대화는 자동으로 컨텍스트를 절약 |
-| 영어 학습 | `/english` | 도입 → 예문 → 역할놀이 → 직접 말하기. 예문 발음은 🔊 버튼으로 |
+## 읽는 순서
 
-## 처음 읽어야 할 파일
+이 저장소에는 문서가 **4개** 있습니다. 위에서부터 읽으면 되고, 이게 전부입니다.
 
-| 파일 | 내용 |
-|------|------|
-| `docs/00-overview.md` | 프로젝트 개요, 목표, 범위 |
-| `docs/01-architecture.md` | 기술 스택, 아키텍처, 폴더 구조 |
-| `docs/02-design-system.md` | 다크 테마, 폰트, 색상, 컴포넌트 규칙 |
-| `docs/03-llm-gateway.md` | LLM provider 설정, 모델, 재시도 정책 |
-| `docs/04-api-contract.md` | API 라우트, Request/Response 스키마 |
-| `docs/05-data-model.md` | 어디에 무엇이 저장되는가 |
-| `docs/06-feature-backlog.md` | Phase별 기능 목록 |
-| `docs/07-rules.md` | 코드 컨벤션과 작업 규칙 |
-| `docs/08-decisions.md` | **결정 기록 — 왜 이렇게 됐는가** |
-| `docs/09-changelog.md` | **변경 이력 + 정기 점검** |
-| `lib/models.ts` | **사용 가능한 모델 목록 — 모델 설정은 여기만 수정** |
+| | 파일 | 답해 주는 것 |
+|---|---|---|
+| 1 | `README.md` (이 파일) | 이게 뭔가, 어떻게 도는지 |
+| 2 | [`docs/RULE.md`](docs/RULE.md) | 앞으로 뭘 지켜야 하나 — **코딩 전에 읽음** |
+| 3 | [`docs/DESIGN.md`](docs/DESIGN.md) | 왜 이렇게 만들었나 + 어디로 가나 |
+| 4 | [`docs/BACKLOG.md`](docs/BACKLOG.md) | 아직 안 된 것 |
+
+모델 목록은 문서가 아니라 **`lib/models.ts`** 한 곳에서만 봅니다. 모델을 추가·삭제할 때 손댈 곳은 저 파일 하나입니다.
 
 ## 빠른 시작
 
-```bash
+```powershell
 cd C:\june\first_app
-cp .env.example .env.local
-# .env.local에 값 등록:
-#   OPENROUTER_API_KEY / GROQ_API_KEY / GEMINI_API_KEY
-#   APP_PIN    — 본인이 정한 6자리 숫자
-#   APP_TOKEN  — 임의의 긴 랜덤 문자열
+Copy-Item .env.example .env.local
 npm install
 npm run dev
 ```
 
-브라우저에서 `http://localhost:3000` 접속 → 6자리 PIN으로 잠금 해제.
+`.env.local`에 채울 값 (없으면 앱이 열리지 않습니다 — fail-closed):
 
-> ⚠️ `.env`가 아니라 **`.env.local`** 입니다. 둘 다 `.gitignore`에 들어가 있습니다.
-> ⚠️ `APP_PIN` / `APP_TOKEN`이 없으면 잠금 화면이 열리지 않습니다 (fail-closed).
-> ⚠️ 환경 변수에 `NEXT_PUBLIC_` 접두사를 붙이면 값이 브라우저 번들에 평문으로 실립니다. 붙이지 마세요.
+```env
+OPENROUTER_API_KEY=...
+GROQ_API_KEY=...
+GEMINI_API_KEY=...
+APP_PIN=본인이 정한 6자리 숫자
+APP_TOKEN=임의의 긴 랜덤 문자열
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...
+```
 
-## 접근 보호
+- **`.env`가 아니라 `.env.local`입니다.** 둘 다 커밋에서 제외됩니다.
+- `SUPABASE_SERVICE_ROLE_KEY`에 **`NEXT_PUBLIC_` 접두사를 절대 붙이지 마세요.**
+  이 키는 DB 권한을 완전히 우회하고, 접두사가 붙는 순간 브라우저 번들에 평문으로 실립니다.
+  자세한 건 [`docs/RULE.md`](docs/RULE.md).
 
-6자리 PIN으로 모든 화면 라우트와 `/api/chat`을 막습니다.
+## 대화 저장이 안 될 때
 
-- PIN은 `.env.local`에만 있고 브라우저로 전달되지 않습니다. 브라우저가 받는 것은 별도의 토큰 하나뿐입니다.
-- **의도적으로 약한 보호입니다.** 토큰이 `sessionStorage`에 있어 개발자도구로 볼 수 있고, 시도 제한이 없습니다.
-  "URL만 아는 사람"은 막지만 "집요한 사람"은 막지 못합니다.
-- 더 강하게 하려면 서버 세션 + 쿠키, 또는 Next 16의 `proxy.ts`로 서버 게이트가 필요합니다.
-  배경과 대안 검토는 `docs/08-decisions.md` D-007을 보세요.
+가장 흔한 함정입니다. **`SUPABASE_SERVICE_ROLE_KEY`가 없으면 저장이 조용히 꺼집니다.**
+화면은 정상 작동하고 대화도 되기 때문에 눈에 띄는 실패가 없습니다.
+
+- 대화 목록이 안 보이면 이 키부터 확인하세요 (503을 "저장 안 됨"으로 바꿔 보여 줍니다).
+- `SUPABASE_URL`은 예전 이름(`NEXT_PUBLIC_SUPABASE_URL`)도 읽지만 `SUPABASE_SERVICE_ROLE_KEY`에는 대체 이름이 없습니다.
+
+스키마는 **`supabase/schema.sql` → `supabase/single-user.sql` 이 순서로** 실행해야 합니다.
+순서가 반대면 정책이 참조하던 열이 사라져 실패합니다.
 
 ## 기술 스택
 
-- **프레임워크**: Next.js 16.3.8 (App Router, Turbopack)
-- **언어**: TypeScript (strict)
-- **CSS**: Tailwind CSS v4
-- **폰트**: `next/font/google` — Syne, DM Mono
-- **LLM 호출**: OpenRouter/Groq는 raw `fetch`, Gemini는 `@google/generative-ai` SDK
-  (Vercel AI SDK **미사용**)
-- **응답**: 비스트리밍 — 전체를 받은 뒤 렌더링 (`docs/08-decisions.md` D-004)
-- **컨텍스트**: 토큰 예산 6,000으로 오래된 메시지를 자릅니다 (`lib/context.ts`, D-014).
-  **예산은 컨텍스트 창이 아니라 provider의 TPM 한도를 기준으로 정했습니다.**
-- **영어 기능**: `jsonMode`로 JSON을 강제해 단계 단위로 파싱합니다 (D-015).
-  발음은 브라우저 Web Speech API라 키도 비용도 없습니다 (D-017)
-- **미사용 의존성**: `openai`, `react-markdown`, `remark-gfm` (마크다운 렌더링 미구현)
+Next.js 16 (App Router) · TypeScript strict · Tailwind v4 · React 19
+LLM 호출은 OpenRouter·Groq가 raw `fetch`, Gemini만 `@google/generative-ai` SDK를 씁니다 (Vercel AI SDK 미사용).
+대화 저장은 Supabase Postgres. 응답은 비스트리밍입니다 — 전체를 받고 나서 렌더링합니다.
 
-### 알려진 불일치
+## 알려진 한계
 
-`package.json`의 `next`는 `^16.3.8`인데 `eslint-config-next`는 `16.2.6`에 고정돼 있습니다.
-동작에는 문제없지만 정렬이 필요합니다.
+읽어두면 좋은 것만 적었습니다. 자세한 건 [`docs/BACKLOG.md`](docs/BACKLOG.md).
+
+- **접근 보호가 약합니다.** 토큰이 `sessionStorage`에 있어 개발자도구로 볼 수 있고 시도 제한이 없습니다.
+  "URL만 아는 사람"은 막지만 "집요한 사람"은 막지 못합니다. 의도적으로 이 수준입니다.
+- **긴 대화는 앞부분이 잘립니다.** 토큰 예산 6,000을 넘으면 오래된 메시지를 버립니다.
+  화면과 DB에는 전부 남지만 **모델에게는 최근 일부만 보입니다.** 압축 요약은 아직 없습니다.
+- 대화가 100턴을 넘으면 "아까 그 얘기"가 풀리지 않습니다. 위와 같은 이유입니다.
