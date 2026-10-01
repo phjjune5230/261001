@@ -59,6 +59,6 @@ URL로 어디서나 접속하게 만들고, 대화를 잃지 않게 한다.
 
 ## 미해결
 
-- [ ] `.env` vs `.env.local` 혼용 — `README.md`는 `.env`, Next.js는 `.env.local`을 쓴다
-- [ ] `next: ^16.3.8`인데 `eslint-config-next`는 `16.2.6`에 고정 — 불일치
-- [ ] 미사용 의존성 — `openai`는 import되지 않음. `react-markdown` / `remark-gfm`은 마크다운 렌더링 구현 시 사용
+- [x] `.env` vs `.env.local` 혼용 — README와 `.env.example`은 이미 `.env.local`을 쓰고 있었습니다. 틀린 건 `.gitignore` 주석 하나였고 고쳤습니다 (0.5.1)
+- [x] `next: ^16.3.8`인데 `eslint-config-next`는 `16.2.6`에 고정 — 16.3.8로 올렸습니다 (0.5.1)
+- [x] 미사용 의존성 — `openai`를 제거했습니다. `lib/llm.ts`가 raw `fetch`로 OpenRouter·Groq를 부르는 것이 D-002의 결정이므로 SDK는 쓰지 않습니다. `react-markdown` / `remark-gfm`은 위 Phase 1 항목("마크다운 렌더링")에서 쓸 예정이라 남겨뒀습니다 — 지우면 나중에 다시 설치해야 합니다 (0.5.1)

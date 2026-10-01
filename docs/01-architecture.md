@@ -14,12 +14,15 @@
 **LLM provider**: OpenRouter, Groq, Gemini 3개 (`08-decisions.md` D-002).
 Anthropic은 제외 (D-001).
 
-**미사용 의존성** — `package.json`에 있으나 어디서도 import하지 않습니다.
+**미사용 의존성** — `package.json`에 있으나 아직 import하지 않습니다.
 
 | 패키지 | 상태 |
 |--------|------|
-| `openai` | 미사용 — OpenRouter/Groq는 raw `fetch`로 호출 |
-| `react-markdown`, `remark-gfm` | 미사용 — 마크다운 렌더링 미구현 (Phase 1 백로그) |
+| `react-markdown`, `remark-gfm` | 마크다운 렌더링 구현 시 사용 예정 (Phase 1 백로그) |
+
+`openai`는 0.5.1에서 제거했습니다. `lib/llm.ts`가 OpenRouter·Groq를 raw `fetch`로
+부르는 것이 D-002의 결정이므로 SDK가 필요 없고, 설치돼 있으면 나중에 "우리는 SDK를
+쓰는데 왜 raw fetch지?" 하는 혼선을 만듭니다.
 
 ---
 
