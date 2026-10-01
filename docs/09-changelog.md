@@ -12,6 +12,11 @@
 그 이전(`v0.1.0`, `v0.2.0`)에는 커밋 이력이 없습니다 — 소급 태그도 없습니다.
 설치는 PortableGit(`git-for-windows/git`의 `v2.56.0.windows.1`)이며 `C:\git`에 있습니다.
 
+**2026-10-01, `v0.5.0`과 함께 GitHub 원격이 생겼습니다.**
+`origin` = `git@github.com:phjjune5230/261001.git` (private, SSH).
+`master`를 기본 브랜치로 씁니다. Vercel은 이 저장소를 보고 자동 배포합니다
+(D-020) — 그러므로 **push 하면 곧바로 배포됩니다.**
+
 최신 버전이 맨 위입니다.
 
 ---
@@ -96,6 +101,44 @@ SUPABASE_SERVICE_ROLE_KEY=여기에-service_role-키
 
 > ⚠️ `SUPABASE_SERVICE_ROLE_KEY`에 `NEXT_PUBLIC_` 접두사를 붙이면 안 됩니다.
 > 이 키는 RLS를 완전히 우회하고, 접두사가 붙는 순간 JS 번들에 평문으로 실립니다.
+
+### 배포 — 2026-10-01 완료
+
+**`https://261001-zeta.vercel.app`** (Vercel Hobby, GitHub `phjjune5230/261001` 연동)
+
+원격 저장소를 만들고 SSH 키로 push했습니다. `master` → `origin/master`,
+태그 `v0.3.0` / `v0.4.0` / `v0.5.0` 올림 (D-009).
+
+HTTP로 확인한 것 (토큰 없이 가능한 범위):
+
+| # | 항목 | 결과 |
+|---|------|------|
+| 1 | `GET /` | ✅ 200 |
+| 2 | `POST /api/auth` PIN 틀림 | ✅ 401 `PIN이 올바르지 않습니다.` |
+| 3 | `GET /api/conversations` 토큰 없음 | ✅ 401 `잠금 해제가 필요합니다.` |
+| 4 | `POST /api/chat` 토큰 없음 | ✅ 401 (provider 호출 안 됨) |
+| 5 | **클라이언트 JS 10개 청크에 Supabase 키/URL 없음** | ✅ |
+
+**5번이 D-022의 핵심 주장이자 가장 중요합니다.** `NEXT_PUBLIC_` 0건,
+`supabase.co` 0건, JWT(`eyJ…`) 0건. `service_role` 문자열이 1건 나오지만
+`ConversationList.tsx`의 안내 문구("`SUPABASE_SERVICE_ROLE_KEY`가 등록되면
+자동 저장됩니다")이고 값이 아닙니다.
+
+브라우저로 확인한 것 (사용자):
+
+| # | 항목 | 결과 |
+|---|------|------|
+| 6 | PIN 해제 | ✅ |
+| 7 | groq 실제 호출 | ✅ |
+| 8 | 대화 저장 → 새로고침 → 목록에 남음 | ✅ |
+
+### 남는 것
+
+- **TPM**: 7번이 한 번 성공했다는 건 Vercel 리전에서 6,000 예산이 거절되지
+  않았다는 뜻입니다. 다만 한 번 성공은 한도가 같다는 증명이 아닙니다.
+  긴 대화를 여러 턴 돌려보고 여전히 통과하는지 나중에 확인하세요 (D-020).
+- `next-env.d.ts`가 `next dev` / `next build`에 따라 경로가 뒤집힙니다.
+  커밋에서 제외하고 있습니다. `.gitignore`에 넣을지는 미결입니다.
 
 ---
 
