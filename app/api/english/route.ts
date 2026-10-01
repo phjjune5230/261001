@@ -7,7 +7,12 @@ import {
   unauthorized,
   userFacingMessage,
 } from '@/lib/api'
-import { keepRecentMessages, countDropped, estimateTokens } from '@/lib/context'
+import {
+  DEFAULT_CONTEXT_BUDGET,
+  keepRecentMessages,
+  countDropped,
+  estimateTokens,
+} from '@/lib/context'
 import {
   LESSON_SYSTEM_PROMPT,
   parseLessonResponse,
@@ -50,7 +55,7 @@ export async function POST(req: NextRequest) {
     const approxTokens = trimmed.reduce((sum, m) => sum + estimateTokens(m.content || ''), 0)
     console.log(
       `[english] ${messages.length} → ${trimmed.length} 메시지` +
-      `${dropped > 0 ? ` (${dropped}개 버림)` : ''}, 약 ${approxTokens} 토큰 (예산 6,000)`
+      `${dropped > 0 ? ` (${dropped}개 버림)` : ''}, 약 ${approxTokens} 토큰 (예산 ${DEFAULT_CONTEXT_BUDGET})`
     )
 
     // 학습자 프로필은 첫 턴의 system 자리를 대신한다. 프런트가 시스템 프롬프트를

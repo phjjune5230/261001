@@ -7,7 +7,12 @@ import {
   unauthorized,
   userFacingMessage,
 } from '@/lib/api'
-import { keepRecentMessages, countDropped, estimateTokens } from '@/lib/context'
+import {
+  DEFAULT_CONTEXT_BUDGET,
+  keepRecentMessages,
+  countDropped,
+  estimateTokens,
+} from '@/lib/context'
 
 export async function POST(req: NextRequest) {
   // 본문 파싱보다 먼저. 토큰이 없으면 provider를 호출할 이유가 없다 —
@@ -38,7 +43,7 @@ export async function POST(req: NextRequest) {
     const approxTokens = trimmed.reduce((sum, m) => sum + estimateTokens(m.content || ''), 0)
     console.log(
       `[chat] ${messages.length} → ${trimmed.length} 메시지` +
-      `${dropped > 0 ? ` (${dropped}개 버림)` : ''}, 약 ${approxTokens} 토큰 (예산 6,000)`
+      `${dropped > 0 ? ` (${dropped}개 버림)` : ''}, 약 ${approxTokens} 토큰 (예산 ${DEFAULT_CONTEXT_BUDGET})`
     )
 
     const result = await callLLM(provider, trimmed, {
