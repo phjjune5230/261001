@@ -7,7 +7,6 @@
  *
  * 왜 Context가 아니라 헬퍼인가:
  *  - 현재 토큰이 필요한 곳은 AuthGate와 채팅 페이지 두 군데뿐이다.
- *    (docs/08-decisions.md D-007)
  *
  * 왜 useSyncExternalStore인지:
  *  - sessionStorage는 React 밖의 저장소라 useEffect로 읽으면 setState-in-effect가 된다.

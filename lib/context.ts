@@ -7,7 +7,7 @@
  *    매 턴 대화 전체를 그대로 API에 보내면 비용이 선형으로 늘고, 결국
  *    provider의 컨텍스트 한도를 넘겨 400으로 거절당합니다.
  *
- *  턴 수가 아니라 토큰 예산으로 자릅니다 (docs/08-decisions.md D-014).
+ *  턴 수가 아니라 토큰 예산으로 자릅니다 (docs/DESIGN.md).
  *    턴 수는 나쁜 기준입니다 — 코드 블록이 잔뜩인 턴이 수천 토큰이고
  *    "ㅇㅇ"가 몇 토큰인지 알 수 없기 때문입니다.
  *
@@ -62,7 +62,7 @@ export function estimateTokens(text: string): number {
  * 순간적으로 여러 요청이 겹칠 때도 버틸 수 있는 값입니다.
  *
  * 더 큰 모델·더 큰 한도를 쓰게 되면 이 상수를 올리되,
- * provider의 실제 TPM 한도를 먼저 확인하고 바꾸세요 (docs/09-changelog.md 정기 점검).
+ * provider의 실제 TPM 한도를 먼저 확인하고 바꾸세요.
  */
 export const DEFAULT_CONTEXT_BUDGET = 6_000
 

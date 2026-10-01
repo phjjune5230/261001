@@ -20,7 +20,7 @@ import { getToken, saveToken, subscribeToken } from '@/lib/auth-client'
  *    "보호된 내용을 그리지 않는다"는 이득이 없고, 깜빡임만 남습니다.
  *    잠금 화면을 fixed 오버레이로 덮어 flickering을 없앴습니다.
  *
- *  보안 수준 (사용자 결정 — docs/08-decisions.md D-007):
+ *  보안 수준 (사용자 결정 — docs/RULE.md):
  *    의도적으로 약하게 만들었습니다. "URL만 알면 끝"인 상태를 막는 것이 목적이며,
  *    토큰이 sessionStorage에 있으므로 개발자도구로 볼 수 있습니다.
  *
