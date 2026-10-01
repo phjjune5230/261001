@@ -52,3 +52,28 @@ export function isKnownProvider(value: unknown): value is Provider {
 export function badRequest(error: string): NextResponse {
   return NextResponse.json({ error }, { status: 400 })
 }
+
+/**
+ * 대화 저장이 설정되지 않았을 때 (D-022).
+ *
+ * 503입니다. 500이 아니라 503인 이유는 "우리가 망했다"가 아니라
+ * "이 배포에는 저장을 붙이지 않았다"를 뜻하기 때문입니다.
+ * 브라우저는 이걸 보고 목록을 비우고 "저장 꺼짐" 안내를 냅니다.
+ */
+export function storageUnavailable(): NextResponse {
+  return NextResponse.json({ error: '대화 저장이 설정되지 않았습니다.' }, { status: 503 })
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * URL의 :id가 uuid인지를 확인합니다.
+ *
+ * 이 검사는 사소해 보이지만 service_role이 RLS를 완전히 우회하기 때문에
+ * 필요합니다 (lib/db-server.ts 참고). "화면에서 안 보인다고" 필터를
+ * 여기서 기대하면 안 되고, 값이 uuid가 아니면 DB에 묻지 않습니다.
+ * 잘못된 값이면 Postgres가 형식 오류를 뱉는 대신 400을 돌려줍니다.
+ */
+export function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID.test(value)
+}

@@ -11,6 +11,11 @@ import type { Conversation } from '@/lib/db'
  * enabled가 false면 목록 영역 자체를 숨깁니다.
  * "저장 안 됨"을 조용히 보여주면 사용자가 무엇이 잘못됐는지 알 수 없으므로,
  * 저장되지 않는 상태는 화면에 드러나야 합니다 (D-018).
+ *
+ * enabled는 더 이상 환경 변수로 판정하지 않습니다 (D-022).
+ * 로그인이 없어진 뒤로 클라이언트는 Supabase 설정 여부를 알 수 없고,
+ * "첫 목록 조회가 성공했는가"가 곧 판정이 됩니다
+ * (hooks/useConversations.ts 참고).
  */
 export default function ConversationList({
   conversations,
@@ -47,7 +52,10 @@ export default function ConversationList({
         <p className="text-[10px] text-[#555] leading-relaxed border border-[#222] rounded px-3 py-2 bg-[#151515]">
           저장이 꺼져 있습니다. 대화는 화면에서만 유지되고 새로고침하면 사라집니다.
           <br />
-          <span className="text-[#444]">Supabase 로그인 후에는 자동 저장됩니다.</span>
+          <span className="text-[#444]">
+            서버에 <span className="text-[#555]">SUPABASE_SERVICE_ROLE_KEY</span>가
+            등록되면 자동 저장됩니다 (D-022).
+          </span>
         </p>
       </div>
     )

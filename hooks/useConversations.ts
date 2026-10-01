@@ -1,16 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   addMessage,
   createConversation,
   deleteConversation,
-  getAuthSnapshot,
-  getServerAuthSnapshot,
-  isSupabaseConfigured,
   listConversations,
   listMessages,
-  subscribeAuth,
   updateConversationSettings,
   type Conversation,
   type ConversationKind,
@@ -19,17 +15,34 @@ import {
 
 /**
  * ============================================================================
- *  대화 목록 + 저장 (Supabase)
+ *  대화 목록 + 저장 (서버 경유)
  * ============================================================================
  *
- *  왜 훅인가 — 채팅과 영어가 완전히 같은 동작을 합니다:
- *    목록 조회, 새 대화, 열기, 삭제, 메시지 저장.
+ *  왜 훅인가 — 채팅과 영어가 완전히 같은 동작을 합니다 (목록·생성·열기·삭제·저장).
  *  이걸 두 페이지에 각각 쓰면 한쪽만 고치는 사고가 반드시 납니다.
  *
- *  ★ Supabase가 없거나 로그인하지 않은 상태에서는 아무 것도 하지 않습니다. ★
- *  enabled가 false면 목록은 비어 있고 저장은 조용히 무시됩니다.
- *  이게 의도입니다 — "저장이 안 된다"는 사실만으로는 채팅을 쓸 수 없어야 하므로
- *  전체 기능을 막으면 안 됩니다. 화면에 표시만 해줍니다 (D-018).
+ *  ★ enabled를 어떻게 정하나 (D-022) ★
+ *  ─────────────────────────────────────────────────────────────────────────
+ *  이전에는 isSupabaseConfigured() && auth.ready && auth.user !== null 이었습니다.
+ *  v0.4.0에서는 그럴듯했습니다 — 클라이언트가 `NEXT_PUBLIC_`로
+ *  "Supabase가 설정돼 있는가"와 "로그인했는가"를 알 수 있었으니까요.
+ *
+ *  D-022에서 로그인을 없애면서 두 문제가 생깁니다.
+ *  하나는 Supabase 설정 여부를 클라이언트가 알 수 없어졌다는 것입니다.
+ *  프로젝트 URL과 anon 키를 서버에만 둡니다. anon 키는 어차피 URL을 아는
+ *  사람에게 이미 공개된 값이라 코드에서 없애도 보안은 같고 번들만 가벼워집니다.
+ *  다른 하나는 저장 안 됨을 미리 알 수 없다는 것입니다.
+ *  배포에 service_role이 없으면 503이 나는 것은 실제로 요청했을 때뿐입니다.
+ *
+ *  그래서 판정 기준을 바꿉니다: enabled는 "첫 목록 조회가 성공했는가"입니다.
+ *  흔들려 보이지만 이게 정확한 답입니다. env가 설정돼 있는데 RLS 정책이
+ *  남아 있으면 403이, 테이블이 없으면 404가, service_role이 없으면 503이
+ *  납니다. 전부 "이 배포에서는 저장이 안 된다"로 수렴합니다.
+ *  반대로 정상 배포에서는 첫 조회가 성공하므로 목록이 보입니다.
+ *
+ *  처음부터 false로 시작하지 않는 이유: 첫 페인트에 "저장 꺼짐"이 잠깐
+ *  보인다가 사라지는 깜빡임이 생깁니다. 이 앱은 대화 기능 하나 때문에
+ *  전체를 막지 않습니다 (D-018). 저장이 안 된다는 사실만 고지할 뿐입니다.
  *
  *  저장을 안 해도 되는 건 알람이나 낙관적 갱신 같은 것뿐입니다.
  *  대화 내용은 화면 상태가 이미 갖고 있으므로, 저장 실패를 굳이 전파하지
@@ -38,7 +51,7 @@ import {
  */
 
 export type ConversationState = {
-  /** 저장이 가능한 상태인가 — 미설정이거나 로그인 안 했으면 false */
+  /** 저장이 되는 상태인가 — 첫 목록 조회가 성공했으면 true */
   enabled: boolean
   conversations: Conversation[]
   activeId: string | null
@@ -62,15 +75,13 @@ export type ConversationState = {
 }
 
 export function useConversations(kind: ConversationKind): ConversationState {
-  const auth = useSyncExternalStore(subscribeAuth, getAuthSnapshot, getServerAuthSnapshot)
-
-  // 로그인 세션 로딩이 끝나기 전에 "로그인 안 함"으로 판단하면
-  // 저장 안 되는 화면이 잠깐 보인다 (또는 그 반대로 튄다).
-  const enabled = isSupabaseConfigured() && auth.ready && auth.user !== null
-
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [loadingList, setLoadingList] = useState(false)
+
+  // 첫 목록 조회가 성공했는가 — 헤더 주석의 D-022 참조.
+  // 처음부터 false가 아니라 true인 이유도 그 주석에 있습니다.
+  const [storageOk, setStorageOk] = useState(true)
 
   const refresh = useCallback(async () => {
     try {
@@ -81,21 +92,23 @@ export function useConversations(kind: ConversationKind): ConversationState {
     }
   }, [kind])
 
-  // enabled가 바뀌거나 종류가 바뀌면 목록을 다시 읽습니다.
+  // 종류가 바뀌면 목록을 다시 읽습니다.
   //
-  // 로그아웃해서 enabled가 false가 될 때는 setState를 하지 않습니다.
-  // 비활성 상태에서 목록을 비우는 것은 **파생값**입니다 — 비워두는 게
-  // 아니라 처음부터 안 보이게 하는 것이 맞습니다 (below의 derived).
+  // 여기가 storageOk를 정하는 유일한 자리입니다. 헤더에서 적었듯
+  // enabled를 여기서 미리 false로 내려놓지 않습니다.
   useEffect(() => {
-    if (!enabled) return
     let cancelled = false
     void (async () => {
       setLoadingList(true)
       try {
         const list = await listConversations(kind)
-        if (!cancelled) setConversations(list)
+        if (cancelled) return
+        setConversations(list)
+        setStorageOk(true)
       } catch {
-        if (!cancelled) setConversations([])
+        if (cancelled) return
+        setConversations([])
+        setStorageOk(false)
       } finally {
         if (!cancelled) setLoadingList(false)
       }
@@ -103,11 +116,10 @@ export function useConversations(kind: ConversationKind): ConversationState {
     return () => {
       cancelled = true
     }
-  }, [enabled, kind])
+  }, [kind])
 
   const newConversation = useCallback(async () => {
     setActiveId(null)
-    if (!enabled) return
     try {
       const created = await createConversation(kind)
       setConversations((prev) => [created, ...prev])
@@ -115,7 +127,7 @@ export function useConversations(kind: ConversationKind): ConversationState {
     } catch {
       // 못 만들어도 새 대화는 쓸 수 있다. 다음 저장 때 다시 시도됩니다.
     }
-  }, [enabled, kind])
+  }, [kind])
 
   const openConversation = useCallback(
     async (id: string | null): Promise<StoredMessage[]> => {
@@ -130,23 +142,19 @@ export function useConversations(kind: ConversationKind): ConversationState {
     []
   )
 
-  const removeConversation = useCallback(
-    async (id: string) => {
-      if (!enabled) return
-      try {
-        await deleteConversation(id)
-        setConversations((prev) => prev.filter((c) => c.id !== id))
-        setActiveId((cur) => (cur === id ? null : cur))
-      } catch {
-        // 삭제는 조용히 실패합니다. 목록이 어긋난 상태를 만드는 게 더 나쁩니다.
-      }
-    },
-    [enabled]
-  )
+  const removeConversation = useCallback(async (id: string) => {
+    try {
+      await deleteConversation(id)
+      setConversations((prev) => prev.filter((c) => c.id !== id))
+      setActiveId((cur) => (cur === id ? null : cur))
+    } catch {
+      // 삭제는 조용히 실패합니다. 목록이 어긋난 상태를 만드는 게 더 나쁩니다.
+    }
+  }, [])
 
   const rememberSettings = useCallback(
     async (provider: string, model: string) => {
-      if (!enabled || !activeId) return
+      if (!activeId) return
       try {
         await updateConversationSettings(activeId, { provider, model })
         // 목록 갱신은 다음 진입 때 — 매번 하면 타이핑할 때마다 요청이 나갑니다.
@@ -154,7 +162,7 @@ export function useConversations(kind: ConversationKind): ConversationState {
         // provider/model은 부가 정보입니다. 실패해도 대화는 이어집니다.
       }
     },
-    [enabled, activeId]
+    [activeId]
   )
 
   /**
@@ -182,8 +190,6 @@ export function useConversations(kind: ConversationKind): ConversationState {
 
   const saveTurn = useCallback(
     async (userContent: string, assistantContent: string, meta?: Record<string, unknown> | null) => {
-      if (!enabled) return false
-
       // 첫 저장이면 대화를 먼저 만듭니다 (제목은 DB 트리거가 첫 메시지로 채웁니다).
       let id = activeId
       if (!id) {
@@ -201,16 +207,17 @@ export function useConversations(kind: ConversationKind): ConversationState {
       if (ok) await refresh()
       return ok
     },
-    [enabled, activeId, kind, persist, refresh]
+    [activeId, kind, persist, refresh]
   )
 
   return {
-    enabled,
-    // enabled가 false면 화면에 내보내는 목록을 비웁니다.
-    // 로그아웃했을 때 이전 계정의 목록이 순간이라도 보이는 것을 막습니다.
-    conversations: enabled ? conversations : [],
-    activeId: enabled ? activeId : null,
-    loadingList: enabled ? loadingList : false,
+    enabled: storageOk,
+    // 저장이 안 되는 상태면 화면에 내보내는 목록을 비웁니다.
+    // 목록 UI 자체가 꺼짐 안내로 바뀌므로 (ConversationList) 목록이
+    // 비어 있는 것과 저장이 안 되는 것이 화면에서 구분됩니다.
+    conversations: storageOk ? conversations : [],
+    activeId: storageOk ? activeId : null,
+    loadingList: storageOk ? loadingList : false,
     newConversation,
     openConversation,
     removeConversation,

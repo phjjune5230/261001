@@ -16,10 +16,77 @@
 
 ---
 
-## 0.4.0 — 2026-10-01 (진행 중 — 배포 준비)
+## 0.5.0 — 2026-10-01 (진행 중)
+
+Supabase Auth를 전부 걷어내고, 대화를 브라우저에서 우리 서버로 옮겼습니다. (D-022)
+**아직 배포하지 않았습니다** — Vercel 등록은 사용자가 해야 합니다.
+
+| 변경 | 이유 | 결정 |
+|------|------|------|
+| `supabase/single-user.sql` 추가 — 정책 7개·`owns_conversation()`·`user_id` 열 삭제 | 로그인이 없으니 RLS 정책이 `auth.uid()`를 볼 수 없고, `user_id`는 넣을 값이 없음 | D-022 |
+| `supabase/single-user.sql` — 인덱스를 `(kind, updated_at)`으로 교체 | `user_id` 열이 사라졌으므로 기존 인덱스가 무의미해짐 | D-022 |
+| `supabase/single-user.sql` — 트리거에서 `c.user_id = auth.uid()` 제거 | 같은 이유 | D-022 |
+| `lib/db-server.ts` 추가 — `service_role` 클라이언트 | 브라우저 anon 키로는 anon 조회를 못 하게 하려면 서버가 DB를 봐야 함 | D-022 |
+| `app/api/conversations/**` 추가 — 목록/생성/수정/삭제/메시지 | 브라우저가 Supabase에 직접 붙을 수 없게 됨 | D-022 |
+| `lib/api.ts` — `storageUnavailable()`, `isUuid()` 추가 | 5개 라우트가 같은 두 가지를 반복하지 않게 | D-022 |
+| `lib/db.ts` — Supabase SDK 제거, fetch로 `/api/conversations` 호출 | anon 키가 번들에 평문으로 실리는 문제 | D-022 |
+| `hooks/useConversations.ts` — auth 의존 제거, `enabled`를 "첫 조회 성공 여부"로 변경 | 클라이언트가 Supabase 설정 여부를 알 수 없게 됨 | D-022 |
+| `components/AuthGate.tsx` — 로그인 오버레이 삭제 | 단일 사용자 | D-022 |
+| `components/SignInForm.tsx` 삭제 | 단일 사용자 | D-022 |
+| `components/ConversationList.tsx` — 안내 문구 교체 | "Supabase 로그인 후…"가 더 이상 맞지 않음 | D-022 |
+| `.env.example` — `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 추가 | Vercel 등록 목록과 맞추기 | D-022 |
+| `docs/08-decisions.md` — D-022 추가, D-019/D-021에 무효 표시 | 판단 근거 기록 | D-009 |
+| `package.json` 버전 0.4.0 → 0.5.0 | 계약이 바뀌었음 (API 경로 신설, 스키마 변경) | D-009 |
+
+### 설계 중 드러난 것
+
+**RLS는 "누가 볼 수 있나"를 정하는 장치인데, 계정이 없으면 아무도 안 보는 벽이 됩니다.**
+D-019가 짠 정책 7개는 전부 `auth.uid()`를 봅니다. 로그인이 없으니 `auth.uid()`는
+늘 `null`이고 어떤 정책도 통과하지 못했습니다. 규칙이 판단 근거를 잃고
+"아무도 못 본다"만 남은 상태였습니다. 아무도 안 보게 되는 건 의도한 바였지만,
+그걸 보장하는 규칙이 "왜"라는 근거를 잃었다는 게 문제였습니다.
+
+**"Supabase 로그인 후에는 자동 저장됩니다"라는 문구가 세 곳에 있었습니다.**
+설정이 바뀌면 세 군데가 함께 거짓말이 됩니다. 이번에 한 곳만 고치고 두 곳을
+남겨 두었다면, 다음에 쓰는 사람은 그 문구를 믿고 디버깅 시간을 잃습니다.
+그래서 `ConversationList.tsx`, `05-data-model.md`, `AuthGate.tsx`를 함께 고쳤습니다.
+
+### 검증
+
+- [x] `npx tsc --noEmit` — 통과
+- [x] `npm run lint` — 통과 (경고 0)
+- [x] `npm run build` — 통과. 라우트 3개 등록 확인
+- [ ] `supabase/schema.sql` 실행 (사용자)
+- [ ] `supabase/single-user.sql` 실행 (사용자)
+- [ ] 정책 0개 확인 / RLS 켜짐 확인 / anon 조회 0 (사용자)
+- [ ] 대화 저장 → 새 브라우저에서 목록 보임
+- [ ] Vercel 배포 후 `/api/chat`의 TPM 한도 확인 (D-020)
+
+### 사용자가 직접 해야 하는 것
+
+Supabase 대시보드에서 두 파일을 **이 순서로** 실행합니다.
+
+1. `supabase/schema.sql`
+2. `supabase/single-user.sql` (이게 없으면 저장이 안 됩니다)
+
+그리고 `.env.local`에 아래 두 줄을 **추가**합니다. `NEXT_PUBLIC_SUPABASE_ANON_KEY`는
+지워도 됩니다 — 클라이언트에서 더 이상 읽지 않습니다.
+
+```env
+SUPABASE_URL=https://여러분의프로젝트.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=여기에-service_role-키
+```
+
+> ⚠️ `SUPABASE_SERVICE_ROLE_KEY`에 `NEXT_PUBLIC_` 접두사를 붙이면 안 됩니다.
+> 이 키는 RLS를 완전히 우회하고, 접두사가 붙는 순간 JS 번들에 평문으로 실립니다.
+
+---
+
+## 0.4.0 — 2026-10-01 (배포 전 — 0.5.0에서 접근 방식을 바꿨습니다)
 
 "URL로 어디서나 접속" 요구에 따른 배포 준비 + 대화 영속화.
-**아직 배포하지 않았습니다** — Vercel 등록은 사용자가 해야 합니다.
+**배포하지 않았습니다** — Vercel 등록은 사용자가 해야 합니다.
+아래 항목 중 로그인 관련은 0.5.0에서 전부 사라졌습니다 (D-022).
 
 | 변경 | 이유 | 결정 |
 |------|------|------|
@@ -51,14 +118,13 @@
 - [x] `supabase/schema.sql` 실행 성공 (사용자)
 - [x] 정책 7개 확인 (사용자)
 - [x] `anon` role로 `conversations` 조회 → 0 (사용자)
-- [ ] 로그인 후 대화 저장 → 새 브라우저에서 목록 보임
-- [ ] 다른 계정으로 로그인하면 해당 계정의 대화가 보임
+- [ ] ~~로그인 후 대화 저장~~ → 0.5.0에서 로그인이 없어짐
+- [ ] ~~다른 계정으로 로그인하면 해당 계정의 대화가 보임~~ → 단일 사용자라 무효
 - [ ] Vercel 배포 후 `/api/chat`의 TPM 한도 확인 (D-020)
 
-**Supabase에서 손댈 것 하나 (안 하면 가입이 막힙니다).**
-Authentication → Sign In Providers → Email → **"Confirm email"을 꺼야 합니다.**
-켜져 있으면 가입 시 인증 링크를 보내는데, 보낼 메일 주소가 없습니다 (D-021).
-계정은 생기지만 로그인이 영영 안 됩니다.
+**Supabase에서 손댈 것 하나 (0.5.0에서 사라졌습니다).**
+Authentication → Sign In Providers → Email → **"Confirm email"을 꺼야 했습니다.**
+로그인이 없어졌으므로 **이 설정은 더 이상 필요 없습니다.** 하지 마세요 (D-022).
 
 ---
 

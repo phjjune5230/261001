@@ -52,11 +52,15 @@ C:\june\first_app\
 │       │   └── route.ts           # POST — PIN 검증 후 토큰 발급
 │       ├── chat/
 │       │   └── route.ts           # POST — LLM 채팅 (토큰 필수)
+│       ├── conversations/         # v0.5.0 신규 (D-022) — 대화 저장 (토큰 필수)
+│       │   ├── route.ts               # GET 목록 · POST 생성
+│       │   └── [id]/
+│       │       ├── route.ts           # PATCH 설정 · DELETE 삭제
+│       │       └── messages/route.ts  # GET 메시지 · POST 저장
 │       └── english/
 │           └── route.ts           # POST — 영어 학습 (토큰 필수, jsonMode)
 ├── components/
-│   ├── AuthGate.tsx               # 'use client' — PIN 잠금 + 로그인 요구
-│   ├── SignInForm.tsx             # 'use client' — Supabase 로그인/가입
+│   ├── AuthGate.tsx               # 'use client' — PIN 잠금 화면
 │   ├── ModelPicker.tsx            # 'use client' — 채팅·영어가 공유하는 모델 선택
 │   ├── ConversationList.tsx       # 'use client' — 대화 목록 (두 화면 공유)
 │   └── SpeakButton.tsx            # 'use client' — Web Speech 발음 (D-017)
@@ -69,10 +73,12 @@ C:\june\first_app\
 │   ├── auth-client.ts             # 클라이언트 전용 — sessionStorage 토큰
 │   ├── api.ts                     # 라우트 공통 — 인증 검사 + 에러 봉쇄
 │   ├── context.ts                 # ★ 컨텍스트 예산 관리 (keepRecentMessages)
-│   ├── db.ts                      # ★ Supabase — 로그인 + 대화 저장 (D-018, D-019)
+│   ├── db-server.ts               # ★ 서버 전용 — service_role Supabase 클라이언트 (D-022)
+│   ├── db.ts                      # ★ 클라이언트 — /api/conversations 호출 (D-022)
 │   └── lesson.ts                  # 영어 세션 계약 — 타입·프롬프트·파서
 ├── supabase/
-│   └── schema.sql                 # ★ 테이블 + RLS 정책 (직접 실행 대상)
+│   ├── schema.sql                 # 테이블 + RLS 정책 (1단계, 직접 실행 대상)
+│   └── single-user.sql            # ★ 로그인 제거 — 정책·user_id 삭제 (2단계, D-022)
 ├── .env.example                   # 환경 변수 템플릿
 ├── .gitignore
 ├── next.config.ts
@@ -88,6 +94,7 @@ C:\june\first_app\
 |--------|------|------|
 | `/`, `/chat`, `/english` | 정적 프리렌더 | `AuthGate`가 항상 렌더됨 (D-013) |
 | `/api/auth`, `/api/chat`, `/api/english` | 동적 | 요청마다 실행 |
+| `/api/conversations/**` | 동적 | v0.5.0 신규. `x-app-token` 필수 (D-022) |
 
 ## 두 화면이 공유하는 것
 
@@ -124,33 +131,50 @@ effect에서 `setState`를 불러 연속 렌더가 발생하기 때문입니다 
 **API(`/api/chat`)는 서버에서 검사하므로 실제로 보호해야 하는 대상은 막혀 있습니다.**
 더 강한 게이트가 필요해지면 Next 16의 `proxy.ts`로 옮깁니다 — D-007의 대안 기각 참고.
 
-### 잠금이 두 겹인 이유 (D-019)
+### 잠금이 두 겹이었던 이유, 그리고 이제 하나인 이유 (D-019 → D-022)
 
-`AuthGate`는 두 가지를 순서대로 요구합니다. **둘의 목적이 다릅니다.**
+`AuthGate`는 v0.4.0까지 두 가지를 순서대로 요구했습니다. **둘의 목적이 다릅니다.**
 
 | 단계 | 막는 것 | 우회하면 |
 |------|---------|----------|
 | 6자리 PIN | 화면 접근 | HTML은 전송됨, 크레딧 소모 가능 |
 | Supabase 로그인 | 대화가 섞이는 것 | RLS가 DB 레벨에서 막음 |
 
-PIN을 없애면 `/api/chat`을 토큰 없이 부를 수 있어 **provider 크레딧**을
-누가 태울 수 있습니다. 로그인을 없애면 대화가 사람마다 섞입니다.
+사용자가 "나만 쓰는거고" 라고 말해 두 번째 층이 없어졌습니다. 이제 잠금 하나입니다.
 
-**Supabase가 미설정이면 로그인을 요구하지 않습니다** — 채팅 기능 하나 때문에
-앱 전체를 못 쓰게 되는 게 더 나쁘기 때문입니다. 이때 저장은 꺼지고 대화 기능은
-그대로 동작합니다.
+**첫 번째 층은 그대로 둡니다.** 잠금이 내려가면 `/api/chat`을 토큰 없이 그대로
+부를 수 있어서, 앱을 열지 않고 `curl` 한 줄로 provider 크레딧을 태울 수 있습니다.
+D-019가 로그인을 만들면서도 이 경고는 지우지 말라고 명시했는데, 그게 맞았습니다.
 
-### 브라우저가 Supabase에 직접 붙는 이유 (D-019)
+### 대화가 왜 서버를 거치나 (D-022)
 
-대화 저장은 **우리 API 라우트를 거치지 않습니다.** 브라우저가 anon 키로
-Supabase에 직접 붙습니다.
+`NEXT_PUBLIC_` 접두사가 붙은 환경 변수는 Next.js가 **클라이언트 번들에 평문으로
+인라인**합니다. 즉 anon 키는 URL을 아는 사람에게 이미 공개된 값입니다.
 
-이유는 보안 경계를 서버가 아니라 **Postgres(RLS)**에 두기 위해서입니다.
-우리 서버를 거치려면 `service_role` 키가 필요하는데, 이 키는 RLS를
-**완전히 우회**합니다 — 애플리케이션 실수 하나가 곧 전 데이터 유출이 됩니다.
+D-019는 그래서 브라우저가 anon 키로 직접 붙게 했고 RLS를 경계로 삼았습니다.
+이게 통했던 건 **RLS 정책이 `auth.uid()`를 보았기 때문**입니다. 계정이 없으니
+그 정책은 아무것도 통과시키지 못했고, 말하자면 경계가 아니라 벽이 되어 버렸습니다.
 
-직접 붙이면 anon role로만 동작하므로 RLS가 끝까지 살아 있고,
-**우회 키가 우리 코드 어디에도 존재하지 않습니다.**
+대신 이렇게 바꿨습니다.
 
-LLM 호출만 예외입니다 — provider 키가 서버에만 있어야 하므로
-`/api/*`는 반드시 우리 서버를 거칩니다.
+```
+브라우저 ──x-app-token──▶ 우리 서버 /api/conversations ──service_role──▶ Supabase
+```
+
+- anon은 여전히 아무것도 못 읽습니다. RLS가 **켜져 있고 정책이 0개**입니다.
+- 접근 문이 하나입니다. LLM 호출과 대화 저장이 같은 검사를 통과합니다.
+- `service_role`은 `NEXT_PUBLIC_`이 없어서 번들에 들어가지 않습니다.
+
+**대가는 분명합니다.** `service_role`은 RLS를 완전히 우회합니다. 라우트에서
+`WHERE` 하나를 빠뜨리면 전체 대화가 나갑니다. 그래서 `app/api/conversations/**`는
+화면에서 골라 준 값을 신뢰하지 않고 라우트가 조건을 직접 적습니다.
+이 규칙은 `lib/db-server.ts` 머리말에 적어 뒀습니다.
+
+### 저장이 꺼졌을 때 어떻게 아는가 (D-022)
+
+`useConversations`의 `enabled`는 더 이상 환경 변수로 판정하지 않습니다.
+클라이언트가 Supabase 설정 여부를 알 수 없게 되었기 때문입니다.
+
+대신 **`enabled`는 첫 목록 조회가 성공했는가**입니다. 503(키 없음),
+404(라우트 없음), 403(RLS 정책이 남음) — 전부 "이 배포에서는 저장이 안 된다"로
+수렴합니다. 처음부터 `false`로 시작하지 않는 이유는 훅 머리말에 있습니다: 깜빡입니다.
