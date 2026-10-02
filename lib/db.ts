@@ -195,3 +195,94 @@ export async function addMessage(
     body: JSON.stringify({ role, content, meta: meta ?? null }),
   })
 }
+
+// ============================================================================
+//  영어 학습 기록
+// ============================================================================
+//
+//  ★ messages.meta에 섞지 않습니다 ★
+//  meta는 영어 턴 복원 전용입니다 (예문·번역). 누적 학습 기록을 거기 넣으면
+//  원본과 파생이 한 덩어리가 되고 나중에 하나를 고칠 때 다른 하나가 깨집니다
+//  (docs/RULE.md §2). 그래서 별도 테이블과 별도 라우트를 씁니다.
+
+export type EnglishChunk = {
+  id: string
+  conversation_id: string
+  session_id: string | null
+  /** 구 자체. 단어가 아니라 구 단위로 남깁니다 */
+  phrase: string
+  meaning: string
+  scenario: string
+  seen_count: number
+  created_at: string
+  last_seen_at: string
+}
+
+export type EnglishErrorRecord = {
+  id: string
+  conversation_id: string
+  session_id: string | null
+  turn_index: number
+  original: string
+  corrected: string
+  reason: string
+  /** lib/lesson.ts의 ErrorCategory */
+  category: string
+  created_at: string
+}
+
+export type EnglishRecords = {
+  chunks: EnglishChunk[]
+  errors: EnglishErrorRecord[]
+}
+
+/**
+ * 학습 기록 조회.
+ *
+ * ★ 실패를 삼키고 빈 값을 돌려줍니다 ★
+ * SQL(add-english-learning.sql)을 아직 실행하지 않은 배포에서도 대화는 계속
+ * 되어야 합니다. lib/compaction.ts가 하는 것과 같습니다 —
+ * "기록이 꺼진 상태"는 정상 상태이지 500을 낼 일이 아닙니다.
+ *
+ * 대화 저장이 아예 없는 배포(503)도 여기서 삼켜집니다. 목록 UI가 "저장 꺼짐"을
+ * 이미 표시하고 있으므로 여기서 또 경고를 만들지 않습니다.
+ */
+export async function listEnglishRecords(
+  conversationId?: string
+): Promise<EnglishRecords> {
+  const empty: EnglishRecords = { chunks: [], errors: [] }
+  try {
+    const query = conversationId
+      ? `?conversationId=${encodeURIComponent(conversationId)}`
+      : ''
+    const data = await api<EnglishRecords>(`/api/english/records${query}`)
+    return { chunks: data.chunks ?? [], errors: data.errors ?? [] }
+  } catch {
+    return empty
+  }
+}
+
+/**
+ * 세션 하나를 저장합니다 (마무리 버튼을 누를 때 한 번).
+ *
+ * 성공/실패를 boolean으로 돌려줍니다 — useConversations의 saveTurn과 같은 방식입니다.
+ * 말미 요약은 화면에 이미 떠 있으므로, 저장이 조용히 안 돼도 사용자는 대화를
+ * 계속 볼 수 있습니다. 그래도 "이 세션은 기록되지 않았습니다"를 알려야 합니다.
+ */
+export async function saveEnglishRecords(payload: {
+  conversationId: string
+  scenario: string
+  summary: string
+  errors: { original: string; corrected: string; reason: string; category: string; turnIndex: number }[]
+  expressions: { phrase: string; meaning: string }[]
+}): Promise<boolean> {
+  try {
+    await api('/api/english/records', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    return true
+  } catch {
+    return false
+  }
+}

@@ -47,7 +47,7 @@ import {
  *  저장을 안 해도 되는 건 알람이나 낙관적 갱신 같은 것뿐입니다.
  *  대화 내용은 화면 상태가 이미 갖고 있으므로, 저장 실패를 굳이 전파하지
  *  않으면 사용자는 chat이 동작하는지 판단할 수 없게 됩니다.
- *  그래서 saveTurn은 성공/실패를 boolean으로 돌려줍니다.
+ *  그래서 saveTurn은 저장 결과를 그대로 돌려줍니다 (성공이면 대화 id, 실패면 null).
  */
 
 export type ConversationState = {
@@ -63,15 +63,23 @@ export type ConversationState = {
   /**
    * 사용자+AI 한 쌍을 저장. 첫 저장이면 대화를 자동으로 만듭니다.
    *
-   * meta는 영어 학습용입니다. 예문·연습 단계(phase, steps)는 문장 텍스트로
-   * 펴면 예문과 번역이 뒤섞여 재구성이 불가능해집니다. 그래서 통째로 meta에 넣습니다
-   *. 채팅은 meta 없이 씁니다.
+   * meta는 영어 학습용입니다. 예문·연습 단계(steps)는 문장 텍스트로
+   * 펴면 예문과 번역이 뒤섞여 재구성이 불가능해집니다. 그래서 통째로 meta에 넣습니다.
+   * 채팅은 meta 없이 씁니다.
+   *
+   * ★ 저장이 성공하면 그 대화의 id를 돌려줍니다. 실패하면 null입니다 ★
+   * boolean이 아니라 id인 것이 핵심입니다. 첫 저장이면 대화를 새로 만들면서
+   * setActiveId를 부르지만, 그건 React state라서 같은 함수 안에서 바로 읽을 수 없습니다.
+   * 그래서 실제로 저장이 끝난 대화의 id를 돌려줍니다 — 첫 턴을 마치고 같은 함수에서
+   * 그 대화의 다른 테이블(영어 학습 기록)을 이어서 써야 하기 때문입니다.
+   * 저장 성공 시 돌려주는 id는 항상 비어 있지 않은 문자열이므로
+   * 기존 호출부의 truthy 판정은 그대로 동작합니다.
    */
   saveTurn: (
     userContent: string,
     assistantContent: string,
     meta?: Record<string, unknown> | null
-  ) => Promise<boolean>
+  ) => Promise<string | null>
 }
 
 export function useConversations(kind: ConversationKind): ConversationState {
@@ -199,13 +207,15 @@ export function useConversations(kind: ConversationKind): ConversationState {
           setActiveId(created.id)
           id = created.id
         } catch {
-          return false
+          return null
         }
       }
 
       const ok = await persist(id, userContent, assistantContent, meta)
       if (ok) await refresh()
-      return ok
+      // 실패를 null로 표현합니다 — 호출부는 truthy 판정만 하므로
+      // boolean으로 쓰던 곳은 손대지 않아도 됩니다.
+      return ok ? id : null
     },
     [activeId, kind, persist, refresh]
   )
