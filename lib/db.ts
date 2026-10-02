@@ -4,12 +4,12 @@ import { clearToken, getToken } from '@/lib/auth-client'
 
 /**
  * ============================================================================
- *  대화 저장 — 우리 API를 통해서만 (D-022)
+ *  대화 저장 — 우리 API를 통해서만
  * ============================================================================
  *
  *  ★ 왜 브라우저가 더 이상 Supabase에 직접 붙지 않는가 ★
  *
- *  v0.4.0까지는 여기서 anon 키로 Supabase에 직접 붙었습니다 (D-019).
+ *  v0.4.0까지는 여기서 anon 키로 Supabase에 직접 붙었습니다.
  *  "보안 경계를 서버가 아니라 Postgres(RLS)에 두자"는 판단이었습니다.
  *
  *  그런데 이 앱은 **한 사람이 씁니다** (사용자 결정). 로그인이 필요해졌을 때
@@ -24,7 +24,7 @@ import { clearToken, getToken } from '@/lib/auth-client'
  *    브라우저 ──x-app-token──▶ 우리 서버 /api/conversations ──service_role──▶ DB
  *
  *  옮긴 결과:
- *    - anon은 아무것도 못 읽습니다. RLS는 켜져 있고 정책이 0개입니다 (D-022).
+ *    - anon은 아무것도 못 읽습니다. RLS는 켜져 있고 정책이 0개입니다.
  *    - 접근 문이 하나입니다. LLM 호출과 대화 저장이 같은 검사를 통과합니다.
  *    - service_role은 서버에만 있습니다. `NEXT_PUBLIC_` 접두사가 없으므로
  *      Next.js가 클라이언트 번들에 인라인하지 않습니다.
@@ -50,7 +50,7 @@ import { clearToken, getToken } from '@/lib/auth-client'
  * 까먹으면 "저장이 조용히 안 되는" 버그가 됩니다.
  *
  * 401은 잠금이 풀렸다는 뜻입니다. 이때 토큰을 지워야 AuthGate가
- * 잠금 화면으로 되돌아갑니다 — 그래야 저절로 복구됩니다 (D-007의 복구 경로).
+ * 잠금 화면으로 되돌아갑니다 — 그래야 저절로 복구됩니다.
  */
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken()

@@ -21,13 +21,13 @@ import {
  *  왜 훅인가 — 채팅과 영어가 완전히 같은 동작을 합니다 (목록·생성·열기·삭제·저장).
  *  이걸 두 페이지에 각각 쓰면 한쪽만 고치는 사고가 반드시 납니다.
  *
- *  ★ enabled를 어떻게 정하나 (D-022) ★
+ *  ★ enabled를 어떻게 정하나 ★
  *  ─────────────────────────────────────────────────────────────────────────
  *  이전에는 isSupabaseConfigured() && auth.ready && auth.user !== null 이었습니다.
  *  v0.4.0에서는 그럴듯했습니다 — 클라이언트가 `NEXT_PUBLIC_`로
  *  "Supabase가 설정돼 있는가"와 "로그인했는가"를 알 수 있었으니까요.
  *
- *  D-022에서 로그인을 없애면서 두 문제가 생깁니다.
+ *  로그인을 없애면서 두 문제가 생깁니다.
  *  하나는 Supabase 설정 여부를 클라이언트가 알 수 없어졌다는 것입니다.
  *  프로젝트 URL과 anon 키를 서버에만 둡니다. anon 키는 어차피 URL을 아는
  *  사람에게 이미 공개된 값이라 코드에서 없애도 보안은 같고 번들만 가벼워집니다.
@@ -42,7 +42,7 @@ import {
  *
  *  처음부터 false로 시작하지 않는 이유: 첫 페인트에 "저장 꺼짐"이 잠깐
  *  보인다가 사라지는 깜빡임이 생깁니다. 이 앱은 대화 기능 하나 때문에
- *  전체를 막지 않습니다 (D-018). 저장이 안 된다는 사실만 고지할 뿐입니다.
+ *  전체를 막지 않습니다. 저장이 안 된다는 사실만 고지할 뿐입니다.
  *
  *  저장을 안 해도 되는 건 알람이나 낙관적 갱신 같은 것뿐입니다.
  *  대화 내용은 화면 상태가 이미 갖고 있으므로, 저장 실패를 굳이 전파하지
@@ -65,7 +65,7 @@ export type ConversationState = {
    *
    * meta는 영어 학습용입니다. 예문·연습 단계(phase, steps)는 문장 텍스트로
    * 펴면 예문과 번역이 뒤섞여 재구성이 불가능해집니다. 그래서 통째로 meta에 넣습니다
-   * (D-016). 채팅은 meta 없이 씁니다.
+   *. 채팅은 meta 없이 씁니다.
    */
   saveTurn: (
     userContent: string,
@@ -79,7 +79,7 @@ export function useConversations(kind: ConversationKind): ConversationState {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [loadingList, setLoadingList] = useState(false)
 
-  // 첫 목록 조회가 성공했는가 — 헤더 주석의 D-022 참조.
+  // 첫 목록 조회가 성공했는가 — 헤더 주석에 이유가 있습니다.
   // 처음부터 false가 아니라 true인 이유도 그 주석에 있습니다.
   const [storageOk, setStorageOk] = useState(true)
 

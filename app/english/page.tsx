@@ -31,7 +31,7 @@ type Entry =
  * content 문자열로 펴서 저장했다가 열면 **예문과 번역이 섞인 한 덩어리**가 되고,
  * 말풍선·🔊 버튼·단계 배지를 그릴 수 없습니다.
  *
- * 그래서 턴은 meta에 통째로 넣고, 여기서 그대로 되돌립니다 (D-016).
+ * 그래서 턴은 meta에 통째로 넣고, 여기서 그대로 되돌립니다.
  * 저장이 없을 때를 위해 턴이 아니면 빈 턴으로 떨어뜨립니다 —
  * 깨진 값을 화면에 흘려보내지 않기 위한 의도적 방어입니다.
  */
@@ -73,7 +73,7 @@ export default function EnglishPage() {
     saveTurn,
   } = useConversations('english')
 
-  /** DB의 평문 content는 히스토리 텍스트로 압축됩니다 (D-016) */
+  /** DB의 평문 content는 히스토리 텍스트로 압축됩니다 */
   const metaToHistoryText = (meta: Record<string, unknown> | null, fallback: string) =>
     turnToHistoryText(metaToTurn(meta, fallback))
 

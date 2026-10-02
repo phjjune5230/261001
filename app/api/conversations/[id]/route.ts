@@ -14,7 +14,7 @@ import { getServerSupabase, isDbConfigured } from '@/lib/db-server'
  *  대화 하나 — 설정 변경 · 삭제
  * ============================================================================
  *
- *  v0.5.0 신규 (D-022). 배경은 app/api/conversations/route.ts에 있습니다.
+ *  v0.5.0 신규. 배경은 app/api/conversations/route.ts에 있습니다.
  *
  *  ★ Next 16에서 params는 Promise입니다 ★
  *  `context.params`를 바로 분해하면 undefined가 됩니다. await 해야 합니다.

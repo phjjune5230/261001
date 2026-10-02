@@ -12,7 +12,7 @@ const isClient = () => true
  * 예문을 읽어주는 버튼.
  *
  * Web Speech API(`speechSynthesis`)를 쓴다 — TTS API 키도, 추가 의존성도 없다.
- * OLD가 쓰던 방식과 같은 근본 선택이지만 구현은 전부 다시 않았다 (D-008).
+ * OLD가 쓰던 방식과 같은 근본 선택이지만 구현은 전부 다시 않았다.
  *
  * 서버에서는 렌더하지 않는다. `window`를 직접 확인하면 서버는 null,
  * 클라이언트는 버튼을 그려 **hydration 불일치**가 납니다. 마운트 여부를

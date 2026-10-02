@@ -6,14 +6,14 @@ import Icon from '@/components/Icon'
 /**
  * 대화 목록 사이드바.
  *
- * 채팅과 영어가 같은 컴포넌트를 씁니다 (D-018) — 목록 UI가 달라질 이유가 없고,
+ * 채팅과 영어가 같은 컴포넌트를 씁니다 — 목록 UI가 달라질 이유가 없고,
  * 두 벌로 만들면 한쪽만 고치는 일이 생깁니다.
  *
  * enabled가 false면 목록 영역 자체를 숨깁니다.
  * "저장 안 됨"을 조용히 보여주면 사용자가 무엇이 잘못됐는지 알 수 없으므로,
- * 저장되지 않는 상태는 화면에 드러나야 합니다 (D-018).
+ * 저장되지 않는 상태는 화면에 드러나야 합니다.
  *
- * enabled는 더 이상 환경 변수로 판정하지 않습니다 (D-022).
+ * enabled는 더 이상 환경 변수로 판정하지 않습니다.
  * 로그인이 없어진 뒤로 클라이언트는 Supabase 설정 여부를 알 수 없고,
  * "첫 목록 조회가 성공했는가"가 곧 판정이 됩니다
  * (hooks/useConversations.ts 참고).
@@ -64,7 +64,7 @@ export default function ConversationList({
           <br />
           <span className="text-ink-faint">
             서버에 <span className="text-ink-muted">SUPABASE_SERVICE_ROLE_KEY</span>가
-            등록되면 자동 저장됩니다 (D-022).
+            등록되면 자동 저장됩니다.
           </span>
         </p>
       </div>

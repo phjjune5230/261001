@@ -9,7 +9,7 @@ import './globals.css'
 
 /**
  * 제목용. IBM Plex Sans를 고른 이유:
- * Syne은 라틴이 "통통"해서personal 앱의 단단한 인상과 어긋났다.
+ * Syne은 라틴이 "통통"해서 개인 앱의 단단한 인상과 어긋났다.
  * Plex Sans는 같은 기술적 성격이면서 훨씬 정돈되어 있고,
  * 아래 Plex Mono와 같은 계보라 세트로 읽힌다.
  */
@@ -41,6 +41,15 @@ const plexMono = IBM_Plex_Mono({
  *
  * weight 범위를 반드시 명시한다. 가변 폰트인데도 범위를 안 주면
  * WebKit에서 굵기가 잘못 렌더링되는 버그가 있다 (Pretendard 공식 README).
+ *
+ * ★ preload를 켜둔 채로 둔 판단입니다 ★
+ * 이 파일 하나가 2MB이고, preload는 모든 페이지의 임계 경로에 올립니다.
+ * 한 인스턴스만 도는 개인 앱이라 감수했습니다. 빼려면 `preload: false`를
+ * 추가하면 되지만, 라틴 폰트가 먼저 오고 한글은 swap으로 뒤따르며
+ * **첫 페인트에 Courier가 보입니다.** 한글 화면이 일순간 기계폰트로 떴다가
+ * 바뀌는 것보다 2MB가 낫다고 판단했습니다.
+ * 더 줄이려면 unicode-range 서브셋 분할(44개 파일)이 있지만,
+ * next/font/local에 넣기엔 파일이 많아 관리가 깨집니다.
  */
 const pretendard = localFont({
   src: './fonts/PretendardVariable.woff2',

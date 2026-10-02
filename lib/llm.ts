@@ -60,7 +60,7 @@ export async function callLLM(
     /**
      * provider의 JSON 모드를 강제한다. 프롬프트에 "JSON으로 답해"라고만 적는 것과
      * 실제로 파서가 붙는 건 Reliability가 다르다. 영어 기능처럼 구조화된 응답이
-     * 필요한 경로에서만 켠다 (D-015).
+     * 필요한 경로에서만 켠다.
      *
      * 주의: 일부 provider는 JSON 모드일 때 시스템 프롬프트에 "json"이라는
      * 단어를 요구한다. 영어 기능 프롬프트에 이미 포함돼 있다.

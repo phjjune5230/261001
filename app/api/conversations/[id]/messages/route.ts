@@ -14,7 +14,7 @@ import { getServerSupabase, isDbConfigured } from '@/lib/db-server'
  *  메시지 — 대화 하나에 속한 턴들
  * ============================================================================
  *
- *  v0.5.0 신규 (D-022). 배경은 app/api/conversations/route.ts에 있습니다.
+ *  v0.5.0 신규. 배경은 app/api/conversations/route.ts에 있습니다.
  *
  *  이 라우트가 특히 조심해야 할 지점은 POST입니다.
  *  외래 키(conversation_id)가 걸려 있으므로 없는 대화에 넣으면 DB가 거절하지만,
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       return badRequest('content가 필요합니다.')
     }
 
-    // meta는 영어 학습 전용입니다 (D-016). 예문·연습 단계(phase, steps)를
+    // meta는 영어 학습 전용입니다. 예문·연습 단계(phase, steps)를
     // 문장 텍스트로 펴면 예문과 번역이 뒤섞여 재구성이 불가능해지므로
     // 통째로 jsonb에 넣습니다. 채팅은 meta 없이 씁니다.
     const meta =

@@ -24,7 +24,7 @@
  *  요약은 "무엇이 말해졌나"가 아니라 "이 대화를 지금까지 얼마나 덮었나"이고,
  *  덮은 범위는 대화를 열 때마다 다시 계산해야 합니다.
  *
- *  게다가 `meta`는 영어 학습의 예문·연습 단계를 원형으로 보존하는 자리(D-016)입니다.
+ *  게다가 `meta`는 영어 학습의 예문·연습 단계를 원형으로 보존하는 자리입니다.
  *  압축 상태를 거기 섞으면 어느 것이 원본이고 어느 것이 파생물인지 구분이 없어집니다.
  *  그래서 `conversations.compaction`(jsonb) 하나를 씁니다.
  *  → supabase/add-compaction.sql 을 실행해야 켜집니다. 안 실행된 배포에서는
@@ -175,13 +175,28 @@ export function planCompaction(
   }
 }
 
-/** 요약을 모델 앞 메시지 배열에 넣습니다. 버린 자리에 요약이 서는 모양입니다. */
+/**
+ * 요약을 모델이 볼 메시지 배열에 넣습니다. 버린 자리에 요약이 서는 모양입니다.
+ *
+ * ★ 별도 메시지로 맨 앞에 넣지 않고 첫 메시지에 합칩니다 ★
+ * 경계 정렬 덕분에 plan.context[0]은 보통 user입니다. 그 앞에 요약을 또 하나
+ * 끼우면 user가 두 개 연달아 갑니다. OpenAI 호환(groq, openrouter)은 그냥
+ * 받아주지만 **Gemini는 역할을 번갈아 요구해서 400을 냅니다.** provider를
+ * 바꾸면 요약이 들어간 대화가 통째로 깨지는 셈이므로 합칩니다.
+ *
+ * 앞이 assistant인 경우는 예산 안에 들어 경계 정렬이 개입하지 않았을 때뿐입니다.
+ * 합칠 자리가 없으니 이때만 메시지 하나로 앞에 놓습니다.
+ */
 export function attachSummary(plan: CompactionPlan): LLMMessage[] {
   if (!plan.summary) return plan.context
-  return [
-    { role: 'user', content: `${SUMMARY_HEADER}${plan.summary}${SUMMARY_FOOTER}` },
-    ...plan.context,
-  ]
+
+  const block = `${SUMMARY_HEADER}${plan.summary}${SUMMARY_FOOTER}`
+  const first = plan.context[0]
+
+  if (!first) return [{ role: 'user', content: block }]
+  if (first.role === 'assistant') return [{ role: 'user', content: block }, ...plan.context]
+
+  return [{ role: first.role, content: `${block}\n\n${first.content}` }, ...plan.context.slice(1)]
 }
 
 /**

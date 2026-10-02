@@ -25,7 +25,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState<boolean>(false)
   // 에러를 대화 말풍선에 섞지 않는다. provider 원본 JSON이 AI 답처럼 보이던 것을 분리.
   const [error, setError] = useState<string>('')
-  // 서버가 컨텍스트 예산 때문에 버린 메시지 수. 숨기면 사용자가 모른다 (D-014).
+  // 서버가 컨텍스트 예산 때문에 버린 메시지 수. 숨기면 사용자가 모른다.
   const [trimmedNotice, setTrimmedNotice] = useState<string>('')
   // 저장이 실패했을 때만 경고합니다. 성공은 조용합니다.
   const [saveWarning, setSaveWarning] = useState<string>('')
@@ -292,6 +292,13 @@ export default function ChatPage() {
             컴포저를 컨테이너 하나로.
             인풋과 버튼이 나란한 회색 박스 2개로 보이던 구조를 접었다.
             포커스는 컨테이너가 받아 테두리만 바꾼다(인풋에 링을 두지 않음).
+          */}
+          {/*
+            마이크 버튼이 없는 것은 빠뜨린 게 아니라 판단입니다.
+            이 앱에는 음성 입력 기능이 없습니다 (BACKLOG의 STT 항목 — 브라우저
+            SpeechRecognition은 Chrome 한정이고 오인식이 잦아 보류 중).
+            동작하지 않는 버튼을 두면 조용한 버그가 되므로, 기능부터 넣고
+            그때 버튼을 추가하세요.
           */}
           <form onSubmit={handleSubmit} className="border-t border-line p-4">
             <div className="flex items-center gap-2 p-2 bg-surface-2 border border-line rounded-xl shadow-edge focus-within:border-line-strong transition-colors">
