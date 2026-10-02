@@ -1,6 +1,7 @@
 'use client'
 
 import type { Conversation } from '@/lib/db'
+import Icon from '@/components/Icon'
 
 /**
  * 대화 목록 사이드바.
@@ -36,24 +37,33 @@ export default function ConversationList({
   onDelete: (id: string) => void
   emptyHint: string
 }) {
+  // 제목 + "새 대화" 줄은 enabled와 무관하게 항상 같다. 조건이 두 벌이면
+  // 나중에 한쪽만 고치는 일이 생긴다.
+  const head = (
+    <div className="flex items-center justify-between mb-2">
+      <label className="block font-mono text-label tracking-label uppercase text-ink-faint">
+        대화 목록
+      </label>
+      <button
+        type="button"
+        onClick={onNew}
+        className="flex items-center gap-1 text-meta text-ink-muted hover:text-ink transition-colors"
+      >
+        <Icon name="plus" size={12} strokeWidth={2} />
+        새 대화
+      </button>
+    </div>
+  )
+
   if (!enabled) {
     return (
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-xs font-semibold text-[#888]">대화 목록</label>
-          <button
-            type="button"
-            onClick={onNew}
-            className="text-[11px] text-[#e8ff47] hover:opacity-80 transition-opacity"
-          >
-            + 새 대화
-          </button>
-        </div>
-        <p className="text-[10px] text-[#555] leading-relaxed border border-[#222] rounded px-3 py-2 bg-[#151515]">
+        {head}
+        <p className="text-meta leading-relaxed text-ink-muted border border-line rounded-md px-3 py-2 bg-surface-1 shadow-edge">
           저장이 꺼져 있습니다. 대화는 화면에서만 유지되고 새로고침하면 사라집니다.
           <br />
-          <span className="text-[#444]">
-            서버에 <span className="text-[#555]">SUPABASE_SERVICE_ROLE_KEY</span>가
+          <span className="text-ink-faint">
+            서버에 <span className="text-ink-muted">SUPABASE_SERVICE_ROLE_KEY</span>가
             등록되면 자동 저장됩니다 (D-022).
           </span>
         </p>
@@ -63,21 +73,12 @@ export default function ConversationList({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="block text-xs font-semibold text-[#888]">대화 목록</label>
-        <button
-          type="button"
-          onClick={onNew}
-          className="text-[11px] text-[#e8ff47] hover:opacity-80 transition-opacity"
-        >
-          + 새 대화
-        </button>
-      </div>
+      {head}
 
       {loading ? (
-        <p className="text-[11px] text-[#444]">불러오는 중...</p>
+        <p className="text-meta text-ink-faint">불러오는 중...</p>
       ) : conversations.length === 0 ? (
-        <p className="text-[11px] text-[#555] leading-relaxed">{emptyHint}</p>
+        <p className="text-meta leading-relaxed text-ink-muted">{emptyHint}</p>
       ) : (
         <ul className="space-y-1 max-h-64 overflow-y-auto">
           {conversations.map((c) => {
@@ -87,16 +88,17 @@ export default function ConversationList({
                 <button
                   type="button"
                   onClick={() => onSelect(c.id)}
-                  className={`w-full text-left rounded px-3 py-2 pr-8 transition-colors ${
+                  aria-current={active ? 'true' : undefined}
+                  className={`w-full text-left rounded-md px-3 py-2 pr-8 border transition-colors ${
                     active
-                      ? 'bg-[#e8ff47]/5 border border-[#e8ff47]/30'
-                      : 'border border-transparent hover:border-[#222] hover:bg-[#151515]'
+                      ? 'bg-surface-2 border-line-strong shadow-edge'
+                      : 'border border-transparent hover:border-line hover:bg-surface-1'
                   }`}
                 >
-                  <span className={`block text-xs truncate ${active ? 'text-[#e8ff47]' : 'text-[#ccc]'}`}>
+                  <span className={`block text-meta truncate ${active ? 'text-ink' : 'text-ink-muted'}`}>
                     {c.title}
                   </span>
-                  <span className="block text-[10px] text-[#444] mt-0.5">
+                  <span className="block text-meta text-ink-faint mt-0.5">
                     {formatWhen(c.updated_at)}
                   </span>
                 </button>
@@ -105,9 +107,9 @@ export default function ConversationList({
                   onClick={() => onDelete(c.id)}
                   title="삭제"
                   aria-label={`${c.title} 삭제`}
-                  className="absolute right-1.5 top-1.5 w-6 h-6 rounded text-[#444] hover:text-[#ef4444] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-colors"
+                  className="absolute right-1.5 top-1.5 w-6 h-6 rounded-sm grid place-items-center text-ink-faint hover:text-danger opacity-0 group-hover:opacity-100 focus:opacity-100 transition-colors"
                 >
-                  ×
+                  <Icon name="trash" size={13} strokeWidth={1.7} />
                 </button>
               </li>
             )

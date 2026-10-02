@@ -7,6 +7,7 @@ import { DEFAULT_PROVIDER, defaultModelFor } from '@/lib/models'
 import { clearToken, getToken } from '@/lib/auth-client'
 import ModelPicker, { CUSTOM } from '@/components/ModelPicker'
 import SpeakButton from '@/components/SpeakButton'
+import Icon from '@/components/Icon'
 import ConversationList from '@/components/ConversationList'
 import { useConversations } from '@/hooks/useConversations'
 import {
@@ -189,33 +190,28 @@ export default function EnglishPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0f0f0f] text-white flex flex-col">
-      <header className="border-b border-[#222] px-6 py-4 flex items-center justify-between">
+    <main className="min-h-screen bg-page text-ink flex flex-col">
+      <header className="border-b border-line px-6 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-[#555] hover:text-[#e8ff47] text-xs transition-colors">
+          <Link href="/" className="text-meta text-ink-muted hover:text-ink transition-colors">
             ← 홈
           </Link>
-          <h1
-            style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700 }}
-            className="text-lg"
-          >
-            영어 학습
-          </h1>
+          <h1 className="font-display text-title">영어 학습</h1>
           {phase && (
-            <span className="text-[10px] px-2 py-1 rounded border border-[#e8ff47]/40 text-[#e8ff47] bg-[#e8ff47]/5">
+            <span className="font-mono text-label tracking-label uppercase text-accent border border-accent/40 bg-accent/5 rounded-sm px-1.5 py-0.5">
               {PHASE_LABEL[phase]}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs text-[#555]">
+        <div className="flex items-center gap-3 text-meta text-ink-muted">
           <span className="hidden md:inline">
-            활성 모델: <span className="text-[#e8ff47] font-mono">{activeModel || '미설정'}</span>
+            활성 모델: <span className="font-mono text-ink">{activeModel || '미설정'}</span>
           </span>
           <button
             type="button"
             onClick={() => void startOver()}
             disabled={entries.length === 0}
-            className="border border-[#222] px-3 py-1.5 rounded text-[#666] hover:border-[#444] hover:text-[#888] disabled:opacity-40 disabled:hover:border-[#222] disabled:hover:text-[#666] transition-colors"
+            className="border border-line rounded-md bg-surface-1 shadow-edge px-3 py-1.5 text-ink-muted hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-surface-1 disabled:hover:text-ink-muted transition-colors"
           >
             새 세션
           </button>
@@ -223,19 +219,21 @@ export default function EnglishPage() {
       </header>
 
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto">
-        <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-[#222] p-6 flex flex-col gap-6">
+        <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-line p-6 flex flex-col gap-6">
           <div>
-            <label className="block text-xs font-semibold text-[#888] mb-2">현재 수준</label>
+            <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
+              현재 수준
+            </label>
             <div className="grid grid-cols-3 gap-2">
               {LEVELS.map((l) => (
                 <button
                   key={l}
                   type="button"
                   onClick={() => setLevel(l)}
-                  className={`px-2 py-2 text-xs rounded border transition-colors ${
+                  className={`px-2 py-2 text-meta rounded-md border text-center transition-colors ${
                     l === level
-                      ? 'border-[#e8ff47] text-[#e8ff47] bg-[#e8ff47]/5'
-                      : 'border-[#222] text-[#555] hover:border-[#444] hover:text-[#888]'
+                      ? 'border-accent/40 bg-accent/5 text-ink'
+                      : 'border-line bg-surface-1 text-ink-muted hover:border-line-strong hover:text-ink'
                   }`}
                 >
                   {l}
@@ -245,11 +243,13 @@ export default function EnglishPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#888] mb-2">목표</label>
+            <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
+              목표
+            </label>
             <select
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              className="w-full bg-[#151515] border border-[#222] rounded px-3 py-2 text-xs text-white focus:border-[#e8ff47] outline-none"
+              className="w-full bg-surface-2 border border-line rounded-md px-3 py-2 pr-8 text-meta text-ink shadow-edge outline-none focus:border-line-strong transition-colors"
             >
               {GOALS.map((g) => (
                 <option key={g} value={g}>
@@ -257,12 +257,12 @@ export default function EnglishPage() {
                 </option>
               ))}
             </select>
-            <p className="mt-2 text-[10px] leading-relaxed text-[#444]">
+            <p className="mt-2 text-meta leading-relaxed text-ink-faint">
               여기서 고른 수준·목표는 서버가 프롬프트를 조립할 때에만 사용됩니다.
             </p>
           </div>
 
-          <div className="border-t border-[#222] pt-6 flex flex-col gap-6">
+          <div className="border-t border-line pt-6 flex flex-col gap-6">
             <ConversationList
               conversations={conversations}
               activeId={activeId}
@@ -288,41 +288,48 @@ export default function EnglishPage() {
         <section className="flex-1 flex flex-col h-[calc(100vh-65px)] md:h-auto">
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {saveWarning && (
-              <div className="text-[11px] text-[#ef8888] border border-[#ef4444]/40 bg-[#ef4444]/5 rounded px-3 py-2">
+              <div className="text-meta text-danger border border-danger/40 bg-danger/5 rounded-md px-3 py-2">
                 {saveWarning}
               </div>
             )}
 
             {entries.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center text-[#555] text-sm">
-                <p>수준과 목표를 고른 뒤 시작하세요.</p>
-                <p className="text-xs text-[#444] mt-1">
-                  예문은 🔊 버튼으로 들을 수 있습니다.
+              <div className="h-full flex flex-col items-center justify-center text-center">
+                <p className="text-body text-ink-muted">수준과 목표를 고른 뒤 시작하세요.</p>
+                <p className="text-meta text-ink-faint mt-1">
+                  예문은 발음 듣기 버튼으로 들을 수 있습니다.
                 </p>
               </div>
             ) : (
               entries.map((entry, idx) =>
                 entry.kind === 'user' ? (
-                  <div key={idx} className="flex flex-col items-end">
-                    <span className="text-[10px] text-[#444] mb-1">나</span>
-                    <div className="max-w-[80%] rounded-xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed bg-[#e8ff47] text-black">
+                  <div
+                    key={idx}
+                    className="flex flex-col gap-1.5 max-w-[80%] self-end items-end"
+                  >
+                    <span className="font-mono text-label tracking-label uppercase text-ink-faint">
+                      나
+                    </span>
+                    <div className="rounded-lg px-4 py-3 text-body whitespace-pre-wrap bg-bubble-me border border-line-strong shadow-edge">
                       {entry.text}
                     </div>
                   </div>
                 ) : (
-                  <div key={idx} className="flex flex-col items-start">
-                    <span className="text-[10px] text-[#444] mb-1">
+                  <div key={idx} className="flex flex-col gap-1.5 self-start items-start">
+                    <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint">
+                      {/* 강조색 두 번째 지점 (채팅 화면의 AI 점과 같은 역할) */}
+                      <i className="w-1 h-1 rounded-full bg-accent" aria-hidden="true" />
                       튜터 · {PHASE_LABEL[entry.turn.phase]}
                     </span>
 
                     {entry.turn.content && (
-                      <div className="max-w-[90%] rounded-xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed bg-[#181818] border border-[#222] text-[#ddd]">
+                      <div className="max-w-[90%] rounded-lg px-4 py-3 text-body whitespace-pre-wrap bg-bubble-them border border-line shadow-edge">
                         {entry.turn.content}
                       </div>
                     )}
 
                     {entry.turn.steps.length > 0 && (
-                      <div className="mt-2 space-y-2 w-full max-w-[90%]">
+                      <div className="mt-1 space-y-2 w-full max-w-[90%]">
                         {entry.turn.steps.map((step, i) => (
                           <StepBubble key={i} step={step} />
                         ))}
@@ -334,21 +341,24 @@ export default function EnglishPage() {
             )}
 
             {loading && (
-              <div className="flex flex-col items-start">
-                <span className="text-[10px] text-[#444] mb-1">튜터 응답 중...</span>
-                <div className="bg-[#181818] border border-[#222] rounded-xl px-4 py-3 text-sm text-[#777] animate-pulse">
+              <div className="flex flex-col gap-1.5 self-start items-start">
+                <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint">
+                  <i className="w-1 h-1 rounded-full bg-accent" aria-hidden="true" />
+                  튜터 응답 중
+                </span>
+                <div className="rounded-lg px-4 py-3 text-body bg-bubble-them border border-line shadow-edge text-ink-faint">
                   생각 중...
                 </div>
               </div>
             )}
 
             {error && (
-              <div className="border border-[#ef4444]/40 bg-[#ef4444]/5 rounded-lg px-4 py-3 text-sm text-[#ef8888] whitespace-pre-wrap leading-relaxed">
+              <div className="border border-danger/40 bg-danger/5 rounded-lg px-4 py-3 text-body text-danger whitespace-pre-wrap">
                 {error}
                 <button
                   type="button"
                   onClick={() => setError('')}
-                  className="block mt-2 text-xs text-[#ef4444] hover:text-[#ef8888] transition-colors"
+                  className="block mt-2 text-meta text-danger/70 hover:text-danger transition-colors"
                 >
                   닫기
                 </button>
@@ -358,24 +368,26 @@ export default function EnglishPage() {
             <div ref={bottomRef} />
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="border-t border-[#222] p-4 bg-[#0f0f0f] flex gap-3"
-          >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="영어로 말해 보세요... (예: I would like to book a table)"
-              className="flex-1 bg-[#151515] border border-[#222] rounded-lg px-4 py-3 text-sm text-white focus:border-[#e8ff47] outline-none"
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="bg-[#e8ff47] text-black font-semibold px-6 py-3 rounded-lg text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
-            >
-              전송
-            </button>
+          {/* 채팅과 같은 컴포저 구조: 컨테이너 하나 + 아이콘 전송 버튼 */}
+          <form onSubmit={handleSubmit} className="border-t border-line p-4">
+            <div className="flex items-center gap-2 p-2 bg-surface-2 border border-line rounded-xl shadow-edge focus-within:border-line-strong transition-colors">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="영어로 말해 보세요... (예: I would like to book a table)"
+                className="flex-1 min-w-0 bg-transparent border-0 px-3 py-2 text-body text-ink placeholder:text-ink-faint focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={loading || !input.trim()}
+                title="전송"
+                aria-label="전송"
+                className="shrink-0 w-8 h-8 rounded-md bg-accent text-page grid place-items-center disabled:opacity-30 transition-opacity"
+              >
+                <Icon name="send" size={16} strokeWidth={2.2} />
+              </button>
+            </div>
           </form>
         </section>
       </div>
@@ -388,32 +400,28 @@ function StepBubble({ step }: { step: LessonStep }) {
 
   return (
     <div
-      className={`rounded-lg border px-4 py-3 ${
-        isPractice
-          ? 'border-[#e8ff47]/40 bg-[#e8ff47]/5'
-          : 'border-[#222] bg-[#151515]'
+      className={`rounded-lg border px-4 py-3 shadow-edge ${
+        isPractice ? 'border-accent/40 bg-accent/5' : 'border-line bg-surface-1'
       }`}
     >
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1.5">
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded ${
-                isPractice ? 'bg-[#e8ff47] text-black font-semibold' : 'bg-[#222] text-[#888]'
+              className={`font-mono text-label tracking-label uppercase rounded-sm px-1.5 py-0.5 ${
+                isPractice ? 'bg-accent text-page font-semibold' : 'bg-surface-3 text-ink-muted'
               }`}
             >
               {isPractice ? '직접 말하기' : '예문'}
             </span>
-            <span className="text-[10px] text-[#555] font-mono">{step.speaker}</span>
+            <span className="font-mono text-meta text-ink-muted">{step.speaker}</span>
           </div>
 
-          <p className="text-sm text-white font-medium leading-relaxed">{step.text}</p>
+          <p className="text-body text-ink font-medium">{step.text}</p>
           {step.translation && (
-            <p className="text-xs text-[#777] mt-1 leading-relaxed">{step.translation}</p>
+            <p className="text-sub text-ink-muted mt-1">{step.translation}</p>
           )}
-          {step.hint && (
-            <p className="text-[11px] text-[#e8ff47]/70 mt-1.5 leading-relaxed">{step.hint}</p>
-          )}
+          {step.hint && <p className="text-meta text-ink-muted mt-1.5">{step.hint}</p>}
         </div>
 
         <SpeakButton text={step.text} />

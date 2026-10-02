@@ -74,15 +74,10 @@ function LockScreen() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0f0f0f] text-white flex flex-col items-center justify-center px-6">
+    <div className="fixed inset-0 z-50 bg-page text-ink flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm">
-        <h1
-          style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700 }}
-          className="text-3xl tracking-tight"
-        >
-          First App
-        </h1>
-        <p className="text-xs text-[#444] mt-1 mb-8">잠금 해제</p>
+        <h1 className="font-display text-display tracking-tight">First App</h1>
+        <p className="text-meta text-ink-muted mt-2 mb-8">잠금 해제</p>
 
         <form onSubmit={handleSubmit}>
           <input
@@ -97,26 +92,26 @@ function LockScreen() {
             placeholder="6자리"
             autoFocus
             aria-label="6자리 PIN"
-            className={`w-full bg-[#151515] border rounded-lg px-4 py-4 text-center text-2xl tracking-[0.5em] pl-[0.9em] text-white outline-none transition-colors ${
-              error ? 'border-[#ef4444]' : 'border-[#222] focus:border-[#e8ff47]'
+            className={`w-full bg-surface-2 border rounded-md px-4 py-4 text-center text-display tracking-[0.5em] pl-[0.9em] text-ink shadow-edge outline-none transition-colors ${
+              error ? 'border-danger' : 'border-line focus:border-line-strong'
             }`}
           />
 
-          {error && <p className="mt-3 text-xs text-[#ef4444] text-center">{error}</p>}
+          {error && <p className="mt-3 text-meta text-danger text-center">{error}</p>}
 
           <button
             type="submit"
             disabled={pin.length !== 6 || busy}
-            className="mt-4 w-full bg-[#e8ff47] text-black font-semibold px-6 py-3 rounded-lg text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className="mt-4 w-full bg-accent text-page font-semibold px-6 py-3 rounded-md text-body disabled:opacity-30 transition-opacity"
           >
             {busy ? '확인 중...' : '잠금 해제'}
           </button>
         </form>
 
-        <p className="mt-8 text-[10px] text-[#444] text-center leading-relaxed">
-          계속할 수 없다면 서버의 <span className="text-[#555]">.env.local</span>에서
+        <p className="mt-8 text-meta text-ink-faint text-center leading-relaxed">
+          계속할 수 없다면 서버의 <span className="text-ink-muted">.env.local</span>에서
           <br />
-          <span className="text-[#555]">APP_PIN</span> 값을 확인하세요.
+          <span className="text-ink-muted">APP_PIN</span> 값을 확인하세요.
         </p>
       </div>
     </div>

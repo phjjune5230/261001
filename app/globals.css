@@ -1,11 +1,99 @@
 @import "tailwindcss";
 
-body {
-  font-family: var(--font-dm-mono), monospace;
+/* ─────────────────────────────────────────────
+   폰트
+   ─────────────────────────────────────────────
+   변수를 참조하는 theme 변수는 반드시 `@theme inline` 으로 선언해야 한다.
+   (일반 `@theme` 이면 var()가 :root에 그대로 박혀, next/font가 만들어 주는
+    --font-* 변수를 런타임에 못 찾는다)
+
+   라틴·숫자 = IBM Plex, 한글 = Pretendard.
+   IBM Plex는 한글 글리프가 없으므로 한글이 떨어질 자리를 Pretendard로
+   명시적으로 채워 둔다. 이 스택 순서가 없으면 전부 generic monospace로
+   떨어진다(Windows면 Courier). */
+@theme inline {
+  --font-body: var(--font-plex-mono), var(--font-pretendard), sans-serif;
+  --font-display: var(--font-plex-sans), var(--font-pretendard), sans-serif;
+  /* `font-mono` 유틸리티(모델 ID, 역할 라벨)도 같은 규칙을 따르게 한다 */
+  --font-mono: var(--font-plex-mono), var(--font-pretendard), monospace;
 }
 
-/* 제목용 디스플레이 폰트 (Syne) */
-.font-display {
-  font-family: var(--font-syne), sans-serif;
-  font-weight: 700;
+@theme {
+  /* ── surface ──────────────────────────────
+     밝기 차이 1~2단계로는 계층이 안 읽힌다. 4단계로 벌었다. */
+  --color-page: #0b0b0b;
+  --color-surface-1: #131313;
+  --color-surface-2: #191919;
+  --color-surface-3: #212121;
+
+  /* ── border ──────────────────────────────
+     면 구분용이다. 텍스트가 아니므로 3:1 미달이어도 괜찮다. */
+  --color-line: #232323;
+  --color-line-strong: #2e2e2e;
+
+  /* ── text ────────────────────────────────
+     ink-muted가 보조 텍스트의 단일 출처다. (구버전 #444/#555/#666/#888 전부 대체)
+     ink-faint는 2.9:1로 읽을 정보를 담지 않는다. "You"/"튜터" 라벨처럼
+     읽지 않아도 기능이 유지되는 곳에만 쓴다. */
+  --color-ink: #e9e9e5;
+  --color-ink-muted: #8d8d88;
+  --color-ink-faint: #5e5e5a;
+
+  /* 말풍선. 액센트를 쓰지 않고 명도만으로 구분한다 (결정 A안).
+     내 말을 밝게 띄워 AI 답이 눈에 띄게 하되, 강조색은 오염시키지 않는다. */
+  --color-bubble-me: #1f1f1f;
+  --color-bubble-them: #0e0e0e;
+
+  --color-accent: #e8ff47;
+  --color-danger: #ef4444;
+
+  /* ── depth ───────────────────────────────
+     검은 배경에 검은 그림자는 안 보인다. 그래서 바깥 그림자 대신
+     상단 1px 하이라이트로 "들어올라온 면"을 만든다. 이게 깊이의 대부분이다. */
+  --shadow-edge: inset 0 1px 0 rgb(255 255 255 / 0.055);
+  --shadow-edge-strong: inset 0 1px 0 rgb(255 255 255 / 0.07);
+
+  /* ── radius ──────────────────────────────
+     기본값(12px/16px)은 다크 테크닉 장르에서 장난감처럼 읽힌다. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+
+  /* ── type ────────────────────────────────
+     6단계만 쓴다. 기존엔 20px와 14px 사이에 단계가 비어 있었다. */
+  --text-display: 30px;
+  --text-display--line-height: 1.15;
+  --text-title: 17px;
+  --text-title--line-height: 1.4;
+  --text-body: 14px;
+  --text-body--line-height: 1.7;
+  --text-sub: 13px;
+  --text-sub--line-height: 1.65;
+  --text-meta: 11px;
+  --text-meta--line-height: 1.5;
+  --text-label: 9px;
+  --text-label--line-height: 1.4;
+  --tracking-label: 0.12em;
+
+  /* ── motion ──────────────────────────────
+     기본 150ms. `transition-colors` 만 쓰고 duration을 빼면 0ms가 된다. */
+  --ease-ui: cubic-bezier(0.2, 0.6, 0.3, 1);
+  --default-transition-duration: 150ms;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-page);
+  color: var(--color-ink);
+}
+
+/* select의 화살표는 OS 그림이라 다크 배경에서 밝게 뜬다. 직접 그린다. */
+select {
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-ink-muted) 50%),
+    linear-gradient(135deg, var(--color-ink-muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  appearance: none;
 }

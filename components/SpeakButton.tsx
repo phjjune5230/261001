@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useSyncExternalStore } from 'react'
+import Icon from '@/components/Icon'
 
 // 마운트 여부를 구독 없이 읽기 위한 더미 구독.
 // 서버에서는 false, 클라이언트에서는 true를 준다.
@@ -46,13 +47,15 @@ export default function SpeakButton({ text, label = '발음 듣기' }: { text: s
       onClick={speak}
       title={label}
       aria-label={label}
-      className={`shrink-0 w-7 h-7 rounded-full border text-xs flex items-center justify-center transition-colors ${
+      aria-pressed={speaking}
+      className={`shrink-0 w-7 h-7 rounded-md border grid place-items-center transition-colors ${
         speaking
-          ? 'border-[#e8ff47] bg-[#e8ff47]/10'
-          : 'border-[#333] text-[#888] hover:border-[#e8ff47] hover:text-[#e8ff47]'
+          ? 'border-accent/40 bg-accent/10 text-accent'
+          : 'border-line bg-surface-1 text-ink-muted hover:border-line-strong hover:text-ink'
       }`}
     >
-      {speaking ? '■' : '🔊'}
+      {/* 🔊/■ 이모지를 쓰면 OS에 따라 모양과 크기가 달라졌다 */}
+      <Icon name={speaking ? 'stop' : 'speaker'} size={14} strokeWidth={1.7} />
     </button>
   )
 }

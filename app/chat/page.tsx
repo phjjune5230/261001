@@ -7,6 +7,7 @@ import { DEFAULT_PROVIDER, defaultModelFor } from '@/lib/models'
 import { clearToken, getToken } from '@/lib/auth-client'
 import ModelPicker, { CUSTOM } from '@/components/ModelPicker'
 import ConversationList from '@/components/ConversationList'
+import Icon from '@/components/Icon'
 import { useConversations } from '@/hooks/useConversations'
 
 type Message = {
@@ -104,6 +105,9 @@ export default function ChatPage() {
           model: activeModel,
           systemPrompt,
           messages: nextMessages,
+          // 압축은 대화 단위라 서버가 알아야 합니다.
+          // 첫 턴에는 아직 대화가 없어서 null입니다 — 그때는 압축할 만큼 길지도 않습니다.
+          conversationId: activeId,
         }),
       })
 
@@ -129,9 +133,14 @@ export default function ChatPage() {
 
       // 버린 게 있을 때만 알려준다. 매번 말을 걸면 노이즈가 된다.
       if (typeof data.droppedMessages === 'number' && data.droppedMessages > 0) {
+        // 압축까지 갱신됐다면 "잘라 버렸다"는 설명이 사실과 어긋납니다.
+        // 그 자리는 요약문이 대신하고 있고, 모델은 그것을 읽습니다.
         setTrimmedNotice(
-          `앞에서 ${data.droppedMessages}개 메시지를 잘랐습니다 (약 ${data.approxTokens ?? 0} 토큰). ` +
-          `화면에는 그대로 남아 있습니다.`
+          data.compacted
+            ? `앞에서 ${data.droppedMessages}개 메시지를 요약으로 대체했습니다 ` +
+              `(약 ${data.approxTokens ?? 0} 토큰). 원본은 화면에 그대로 남아 있습니다.`
+            : `앞에서 ${data.droppedMessages}개 메시지를 잘랐습니다 ` +
+              `(약 ${data.approxTokens ?? 0} 토큰). 화면에는 그대로 남아 있습니다.`
         )
       } else {
         setTrimmedNotice('')
@@ -145,27 +154,31 @@ export default function ChatPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0f0f0f] text-white flex flex-col">
+    <main className="min-h-screen bg-page text-ink flex flex-col">
       {/* Header */}
-      <header className="border-b border-[#222] px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-line px-6 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-[#555] hover:text-[#e8ff47] text-xs transition-colors">
+          <Link
+            href="/"
+            className="text-meta text-ink-muted hover:text-ink transition-colors"
+          >
             ← 홈
           </Link>
-          <h1 style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700 }} className="text-lg">
-            AI 채팅
-          </h1>
+          <h1 className="font-display text-title">AI 채팅</h1>
         </div>
-        <div className="flex items-center gap-2 text-xs text-[#555]">
+        <div className="flex items-center gap-2 text-meta text-ink-muted">
           <span>활성 모델:</span>
-          <span className="text-[#e8ff47] font-mono">{provider} / {activeModel || '모델 미설정'}</span>
+          {/* 강조색은 전송 버튼과 AI 라벨 점 두 곳에만 쓴다 */}
+          <span className="font-mono text-ink">
+            {provider} / {activeModel || '모델 미설정'}
+          </span>
         </div>
       </header>
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto">
         {/* Sidebar Controls */}
-        <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-[#222] p-6 flex flex-col gap-6">
+        <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-line p-6 flex flex-col gap-6">
           <ConversationList
             conversations={conversations}
             activeId={activeId}
@@ -187,12 +200,14 @@ export default function ChatPage() {
           />
 
           <div>
-            <label className="block text-xs font-semibold text-[#888] mb-2">시스템 프롬프트</label>
+            <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
+              시스템 프롬프트
+            </label>
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               rows={4}
-              className="w-full bg-[#151515] border border-[#222] rounded p-3 text-xs text-white focus:border-[#e8ff47] outline-none resize-none"
+              className="w-full bg-surface-2 border border-line rounded-md p-3 text-sub text-ink font-mono shadow-edge outline-none focus:border-line-strong transition-colors resize-none"
             />
           </div>
         </aside>
@@ -200,38 +215,46 @@ export default function ChatPage() {
         {/* Chat Area */}
         <section className="flex-1 flex flex-col h-[calc(100vh-65px)] md:h-auto">
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {trimmedNotice && (
-              <div className="text-[11px] text-[#666] border border-[#222] rounded px-3 py-2 bg-[#151515]">
+              <div className="text-meta text-ink-muted border border-line rounded-md px-3 py-2 bg-surface-1 shadow-edge">
                 {trimmedNotice}
               </div>
             )}
 
             {saveWarning && (
-              <div className="text-[11px] text-[#ef8888] border border-[#ef4444]/40 bg-[#ef4444]/5 rounded px-3 py-2">
+              <div className="text-meta text-danger border border-danger/40 bg-danger/5 rounded-md px-3 py-2">
                 {saveWarning}
               </div>
             )}
 
             {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center text-[#555] text-sm">
-                <p>대화를 시작해보세요.</p>
-                <p className="text-xs text-[#444] mt-1">프로바이더와 모델을 변경하며 테스트할 수 있습니다.</p>
+              <div className="h-full flex flex-col items-center justify-center text-center">
+                <p className="text-body text-ink-muted">대화를 시작해보세요.</p>
+                <p className="text-meta text-ink-faint mt-1">
+                  프로바이더와 모델을 변경하며 테스트할 수 있습니다.
+                </p>
               </div>
             ) : (
               messages.map((m, idx) => (
                 <div
                   key={idx}
-                  className="flex flex-col"
+                  className={`flex flex-col gap-1.5 max-w-[80%] ${
+                    m.role === 'user' ? 'self-end items-end' : 'self-start items-start'
+                  }`}
                 >
-                  <span className="text-[10px] text-[#444] mb-1">
+                  <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint">
+                    {/* AI 라벨 앞의 점 — 강조색 두 번째(마지막) 지점 */}
+                    {m.role === 'assistant' && (
+                      <i className="w-1 h-1 rounded-full bg-accent" aria-hidden="true" />
+                    )}
                     {m.role === 'user' ? 'You' : 'AI'}
                   </span>
                   <div
-                    className={`max-w-[80%] rounded-xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed ${
+                    className={`rounded-lg px-4 py-3 text-body whitespace-pre-wrap border shadow-edge ${
                       m.role === 'user'
-                        ? 'bg-[#e8ff47] text-black self-end'
-                        : 'bg-[#181818] border border-[#222] text-[#ddd]'
+                        ? 'bg-bubble-me border-line-strong'
+                        : 'bg-bubble-them border-line'
                     }`}
                   >
                     {m.content}
@@ -240,20 +263,23 @@ export default function ChatPage() {
               ))
             )}
             {loading && (
-              <div className="flex flex-col items-start">
-                <span className="text-[10px] text-[#444] mb-1">AI 응답 중...</span>
-                <div className="bg-[#181818] border border-[#222] rounded-xl px-4 py-3 text-sm text-[#777] animate-pulse">
+              <div className="flex flex-col gap-1.5 self-start items-start">
+                <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint">
+                  <i className="w-1 h-1 rounded-full bg-accent" aria-hidden="true" />
+                  AI 응답 중
+                </span>
+                <div className="rounded-lg px-4 py-3 text-body bg-bubble-them border border-line shadow-edge text-ink-faint">
                   생성 중...
                 </div>
               </div>
             )}
             {error && (
-              <div className="border border-[#ef4444]/40 bg-[#ef4444]/5 rounded-lg px-4 py-3 text-sm text-[#ef8888] whitespace-pre-wrap leading-relaxed">
+              <div className="border border-danger/40 bg-danger/5 rounded-lg px-4 py-3 text-body text-danger whitespace-pre-wrap">
                 {error}
                 <button
                   type="button"
                   onClick={() => setError('')}
-                  className="block mt-2 text-xs text-[#ef4444] hover:text-[#ef8888] transition-colors"
+                  className="block mt-2 text-meta text-danger/70 hover:text-danger transition-colors"
                 >
                   닫기
                 </button>
@@ -262,22 +288,30 @@ export default function ChatPage() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Input Form */}
-          <form onSubmit={handleSubmit} className="border-t border-[#222] p-4 bg-[#0f0f0f] flex gap-3">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="메시지를 입력하세요..."
-              className="flex-1 bg-[#151515] border border-[#222] rounded-lg px-4 py-3 text-sm text-white focus:border-[#e8ff47] outline-none"
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="bg-[#e8ff47] text-black font-semibold px-6 py-3 rounded-lg text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
-            >
-              전송
-            </button>
+          {/*
+            컴포저를 컨테이너 하나로.
+            인풋과 버튼이 나란한 회색 박스 2개로 보이던 구조를 접었다.
+            포커스는 컨테이너가 받아 테두리만 바꾼다(인풋에 링을 두지 않음).
+          */}
+          <form onSubmit={handleSubmit} className="border-t border-line p-4">
+            <div className="flex items-center gap-2 p-2 bg-surface-2 border border-line rounded-xl shadow-edge focus-within:border-line-strong transition-colors">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="메시지를 입력하세요..."
+                className="flex-1 min-w-0 bg-transparent border-0 px-3 py-2 text-body text-ink placeholder:text-ink-faint focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={loading || !input.trim()}
+                title="전송"
+                aria-label="전송"
+                className="shrink-0 w-8 h-8 rounded-md bg-accent text-page grid place-items-center disabled:opacity-30 transition-opacity"
+              >
+                <Icon name="send" size={16} strokeWidth={2.2} />
+              </button>
+            </div>
           </form>
         </section>
       </div>

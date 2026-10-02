@@ -31,7 +31,7 @@ export default function ModelPicker({
   return (
     <>
       <div>
-        <label className="block text-xs font-semibold text-[#888] mb-2">
+        <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
           프로바이더 (Provider)
         </label>
         <div className="grid grid-cols-2 gap-2">
@@ -40,10 +40,10 @@ export default function ModelPicker({
               key={p}
               type="button"
               onClick={() => onProviderChange(p)}
-              className={`px-3 py-2 text-xs rounded border text-left transition-colors ${
+              className={`px-3 py-2 text-meta rounded-md border text-left transition-colors ${
                 p === provider
-                  ? 'border-[#e8ff47] text-[#e8ff47] bg-[#e8ff47]/5'
-                  : 'border-[#222] text-[#555] hover:border-[#444] hover:text-[#888]'
+                  ? 'border-accent/40 bg-accent/5 text-ink'
+                  : 'border-line bg-surface-1 text-ink-muted hover:border-line-strong hover:text-ink'
               }`}
             >
               {p}
@@ -53,13 +53,13 @@ export default function ModelPicker({
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-[#888] mb-2">
+        <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
           모델 선택 (Model)
         </label>
         <select
           value={model}
           onChange={(e) => onModelChange(e.target.value)}
-          className="w-full bg-[#151515] border border-[#222] rounded px-3 py-2 text-xs text-white focus:border-[#e8ff47] outline-none"
+          className="w-full bg-surface-2 border border-line rounded-md px-3 py-2 pr-8 text-meta text-ink shadow-edge outline-none focus:border-line-strong transition-colors"
         >
           {MODELS[provider].map((m) => (
             <option key={m.id} value={m.id}>
@@ -75,12 +75,12 @@ export default function ModelPicker({
             value={customModel}
             onChange={(e) => onCustomModelChange(e.target.value)}
             placeholder="model ID 입력 (예: openai/gpt-oss-120b)"
-            className="mt-2 w-full bg-[#151515] border border-[#e8ff47] rounded px-3 py-2 text-xs font-mono text-white focus:border-[#e8ff47] outline-none"
+            className="mt-2 w-full bg-surface-2 border border-accent/40 rounded-md px-3 py-2 text-meta font-mono text-ink shadow-edge outline-none focus:border-accent/60 transition-colors"
           />
         )}
 
-        <p className="mt-2 text-[10px] leading-relaxed text-[#444]">
-          목록 변경은 <code className="text-[#666]">lib/models.ts</code> 에서.
+        <p className="mt-2 text-meta leading-relaxed text-ink-faint">
+          목록 변경은 <code className="text-ink-muted">lib/models.ts</code> 에서.
           <br />
           목록에 없는 모델은 &lsquo;직접 입력&rsquo;으로 ID만 넣으면 됩니다.
         </p>
