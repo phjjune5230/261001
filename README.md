@@ -59,6 +59,9 @@ SUPABASE_SERVICE_ROLE_KEY=...
 스키마는 **`supabase/schema.sql` → `supabase/single-user.sql` 이 순서로** 실행해야 합니다.
 순서가 반대면 정책이 참조하던 열이 사라져 실패합니다.
 
+그다음 **`supabase/add-compaction.sql`** 을 실행하면 긴 대화의 압축이 켜집니다.
+이것만 빠져 있으면 앱은 그대로 돌아가며 긴 대화를 예전처럼 잘라 버립니다.
+
 ## 기술 스택
 
 Next.js 16 (App Router) · TypeScript strict · Tailwind v4 · React 19
@@ -71,7 +74,9 @@ LLM 호출은 OpenRouter·Groq가 raw `fetch`, Gemini만 `@google/generative-ai`
 
 - **접근 보호가 약합니다.** 토큰이 `sessionStorage`에 있어 개발자도구로 볼 수 있고 시도 제한이 없습니다.
   "URL만 아는 사람"은 막지만 "집요한 사람"은 막지 못합니다. 의도적으로 이 수준입니다.
-- **긴 대화는 앞부분이 잘립니다.** 토큰 예산을 넘으면 오래된 메시지를 버립니다.
-  (예산 값은 `lib/context.ts`의 `DEFAULT_CONTEXT_BUDGET` 한 곳에만 있습니다.)
-  화면과 DB에는 전부 남지만 **모델에게는 최근 일부만 보입니다.** 압축 요약은 아직 없습니다.
-- 대화가 100턴을 넘으면 "아까 그 얘기"가 풀리지 않습니다. 위와 같은 이유입니다.
+- **긴 대화는 앞부분이 요약으로 바뀝니다.** 토큰 예산을 넘으면 오래된 메시지를
+  버리는 대신 요약문을 남깁니다 — 설계와 판단 근거는 `lib/compaction.ts`에 있습니다.
+  화면과 DB에는 **전부 그대로 남습니다.** 줄어드는 것은 모델에게 보이는 것뿐입니다.
+  요약은 provider를 새로 고르지 않고 이번 턴에 쓰신 provider로 만듭니다.
+  `supabase/add-compaction.sql`을 실행하지 않은 배포에서는 조용히 꺼져 있어
+  예전처럼 그냥 버립니다 — 이때만 "아까 그 얘기"가 풀리지 않습니다.

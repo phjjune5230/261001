@@ -11,9 +11,10 @@
  *    턴 수는 나쁜 기준입니다 — 코드 블록이 잔뜩인 턴이 수천 토큰이고
  *    "ㅇㅇ"가 몇 토큰인지 알 수 없기 때문입니다.
  *
- *  ── 아직 하지 않는 것 ───────────────────────────────────────────────────
- *  요약 압축(compaction)과 프리픽스 캐싱은 영어 기능이 들어온 뒤 설계합니다.
- *  여기서는 "오래된 걸 버리는" 것까지만 합니다. 요약은 별도 결정이 필요합니다.
+ *  ── 여기까지가 예산 관리 ──────────────────────────────────────────────────
+ *  요약 압축(compaction)은 lib/compaction.ts에 있습니다.
+ *  여기는 "버릴 것을 고르는" 것까지만 책임집니다. 왜 잘렸는지는
+ *  압축이 답합니다 — 여기서는 알 필요가 없습니다.
  */
 
 /**
@@ -71,6 +72,15 @@ type ContentLike = { content: string; role?: string }
 /**
  * 예산을 넘을 때 오래된 메시지부터 버리고 최근만 남깁니다.
  * 첫 메시지가 system이면 절대 버리지 않습니다 (지시문이 사라지면 의미가 바뀝니다).
+ *
+ * ★ 남은 첫 메시지는 반드시 user여야 합니다 ★
+ * 순서만 보고 자르면 요청-응답 쌍이 중간에서 갈라집니다. 그렇게 남은
+ * "응답만 있는 상태"를 provider는 보통 정상으로 받습니다 — 그래서
+ * 조용히 이상한 답이 나오고, 원인이 보이지 않습니다.
+ * 그래서 예산이 이미 충분해도 경계가 assistant에 걸렸다면 한 번 더 버립니다.
+ *
+ * 예외: 메시지가 하나뿐이면 남깁니다. 마지막 메시지를 버리면
+ * 모델이 받을 것이 없어 요청이 실패합니다. 이 한 건은 의도적으로 남습니다.
  */
 export function keepRecentMessages<T extends ContentLike>(
   messages: T[],
@@ -86,8 +96,9 @@ export function keepRecentMessages<T extends ContentLike>(
   let total = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0)
   if (total <= budget) return messages
 
-  // 뒤에서부터 확보 — 최근일수록 중요하므로
-  while (tail.length > 1 && total > budget) {
+  // 뒤에서부터 확보 — 최근일수록 중요하므로.
+  // 남은 맨 앞이 assistant인 동안에는 계속 버립니다 (요청이 없는데 답부터 있으니).
+  while (tail.length > 1 && (total > budget || tail[0].role === 'assistant')) {
     const dropped = tail.shift()
     if (!dropped) break
     total -= estimateTokens(dropped.content)
