@@ -60,11 +60,32 @@ export type CompactionState = {
 export const MIN_MESSAGES_TO_SUMMARIZE = 4
 
 /**
- * 요약문 상한. 한글이 글자당 1토큰이므로 1500자는 1500토큰쯤입니다 (lib/context.ts).
+ * 요약문 상한. 한글이 글자당 1토큰이므로 700자는 700토큰쯤입니다 (lib/context.ts).
  * 생성 쪽은 maxTokens로 막지만, 모델이 상한을 무시하고 길게 쓰는 경우를 막습니다.
  * 여기서 자른 뒤는 뒤가 잘린 요약이 됩니다 — 앞부분이 살아 있는 편이 낫습니다.
+ *
+ * 1500에서 700으로 내린 이유: 요약은 압축할 때마다 "기존 요약 + 새로 압축할 부분"으로
+ * 다시 만들어집니다. 즉 매번 이 길이만큼 다시 송신됩니다. groq의 분당 8,000 토큰
+ * (console.groq.com/docs/rate-limits) 안에서 그게 두 번 반복되면 본 호출 몫이 없어집니다.
  */
-const MAX_SUMMARY_CHARS = 1500
+const MAX_SUMMARY_CHARS = 700
+
+/**
+ * ★ 압축할 전사의 상한 — 이것이 없으면 압축은 동작하지 않습니다 ★
+ *
+ * `droppedMessages`는 "버려진 메시지 전부"입니다. 대화가 예산을 넘었다는 사실
+ * 자체가 이 묶음이 본문보다 크다는 뜻이라, 상한 없이 그대로 보내면 provider가
+ * 반드시 거절합니다. 거절되면 catch가 삼키고 null을 돌려주므로 조용히 실패합니다 —
+ * 사용자는 "압축이 안 되나?"를 알 방법이 없고, 대화가 잘린 채로 진행됩니다.
+ *
+ * 실제로 lib/context.ts에 기록된 2026-10-01 사고(groq "Requested 46197")가
+ * 여기서 상한이 없어서 생긴 것이었습니다.
+ *
+ * 넘으면 **최근 쪽을 남기고 오래된 쪽을 버립니다.** 이번에 압축하는 구간의 앞부분이
+ * 오히려 더 오래된 대화일 테니, 이미 있는 요약(previousSummary)이 그것을 덮고 있습니다.
+ * 없는 경우(첫 압축) 일부가 빠지지만, 요청이 통째로 실패하는 것보다 나습니다.
+ */
+const MAX_TRANSCRIPT_TOKENS = 1000
 
 /** 요약 자체가 예산을 다 먹지 못하도록 남겨 두는 바닥값 */
 const MIN_BUDGET_FOR_MESSAGES = 1500
@@ -213,6 +234,33 @@ export function attachSummary(plan: CompactionPlan): LLMMessage[] {
  *
  * 실패하면 null입니다. 요약이 못 만들어져도 이번 턴의 대답은 해야 합니다.
  */
+/**
+ * ★ 요약 요청에 보낼 전사가 예산 안에 들어가게 자릅니다 ★
+ *
+ * `droppedMessages`에는 상한이 없습니다. 대화가 예산을 초과했다는 사실 자체가
+ * 이 묶음이 본문보다 크다는 뜻이기 때문입니다. 그대로 보내면 provider가 거절하고
+ * 그 예외는 아래 catch가 삼킵니다 — 조용히 실패합니다 (MAX_TRANSCRIPT_TOKENS 참고).
+ *
+ * 오래된 쪽부터 버립니다. 버려진 구간의 맨 앞은 이미 previousSummary가 덮고 있고,
+ * 이번 호출의 목적이 "새로 생긴 것만 더하기"이기 때문입니다.
+ *
+ * 반환값의 두 번째 값은 자른 게 있다는 표시입니다. prompt에 그대로 실려 모델이
+ * 전체가 아님을 알게 합니다 — 모르고 요약하면 없는 내용을 지어낼 수 있습니다.
+ */
+function capTranscript(messages: LLMMessage[]): { kept: LLMMessage[]; truncated: number } {
+  const kept: LLMMessage[] = []
+  let total = 0
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const cost = estimateTokens(messages[i].content)
+    if (total + cost > MAX_TRANSCRIPT_TOKENS) break
+    kept.unshift(messages[i])
+    total += cost
+  }
+
+  return { kept, truncated: messages.length - kept.length }
+}
+
 export async function summarizeDropped(
   provider: Provider,
   model: string | undefined,
@@ -221,7 +269,10 @@ export async function summarizeDropped(
 ): Promise<string | null> {
   if (droppedMessages.length === 0) return null
 
-  const transcript = droppedMessages
+  const { kept, truncated } = capTranscript(droppedMessages)
+  if (kept.length === 0) return null
+
+  const transcript = kept
     .map((m, i) => `${i + 1}. ${m.role === 'user' ? '사용자' : 'AI'}: ${m.content}`)
     .join('\n\n')
 
@@ -231,13 +282,17 @@ export async function summarizeDropped(
 
   const prompt =
     `${previousBlock}<새로 압축할 대화>\n${transcript}\n</새로 압축할 대화>\n\n` +
-    `위 ${droppedMessages.length}개 메시지를 위 규칙대로 요약문 하나로 만드세요.`
+    `위 ${kept.length}개 메시지를 위 규칙대로 요약문 하나로 만드세요.` +
+    (truncated > 0
+      ? `\n\n주의: 대화가 길어서 앞의 ${truncated}개 메시지는 잘려서 빠졌습니다. ` +
+        `보이는 내용만으로 요약하고, 보이지 않은 내용을 지어내지 마세요.`
+      : '')
 
   try {
     const result = await callLLM(provider, [{ role: 'user', content: prompt }], {
       model,
       systemPrompt: SUMMARY_SYSTEM_PROMPT,
-      maxTokens: 900,
+      maxTokens: 600,
     })
     const text = result.content.trim()
     if (!text) return null

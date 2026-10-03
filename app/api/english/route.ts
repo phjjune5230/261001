@@ -76,19 +76,30 @@ export async function POST(req: NextRequest) {
       return badRequest('messages가 필요합니다.')
     }
 
-    const trimmed = keepRecentMessages(messages as LLMMessage[])
-    const dropped = countDropped(messages.length, trimmed.length)
-    const approxTokens = trimmed.reduce((sum, m) => sum + estimateTokens(m.content || ''), 0)
-    console.log(
-      `[english] ${messages.length} → ${trimmed.length} 메시지` +
-      `${dropped > 0 ? ` (${dropped}개 버림)` : ''}, 약 ${approxTokens} 토큰 (예산 ${DEFAULT_CONTEXT_BUDGET})` +
-      `${finish ? ' · 마무리' : ''}`
-    )
-
+    // ★ 시스템 프롬프트를 먼저 만들고, 그 비용을 빼고 메시지를 자릅니다 ★
+    // 순서가 중요합니다. 메시지를 먼저 자르면 llm.ts가 앞에 따로 붙이는
+    // 시스템 프롬프트(LESSON_SYSTEM_PROMPT가 약 965토큰)가 예산 밖에서 더해져
+    // 4,300 + 965 + 2,000 으로 8,000에 꽉 차고, 근사가 조금만 틀리면 거절당합니다.
     const systemPrompt = buildSystemPrompt(
       typeof scenario === 'string' ? scenario : '',
       Boolean(finish),
       review as ReviewInput | undefined
+    )
+    const systemTokens = estimateTokens(systemPrompt)
+
+    const trimmed = keepRecentMessages(
+      messages as LLMMessage[],
+      DEFAULT_CONTEXT_BUDGET - systemTokens
+    )
+    const dropped = countDropped(messages.length, trimmed.length)
+    const approxTokens = trimmed.reduce((sum, m) => sum + estimateTokens(m.content || ''), 0)
+    const maxTokens = finish ? TOKENS_FINISH : TOKENS_PER_TURN
+    console.log(
+      `[english] ${messages.length} → ${trimmed.length} 메시지` +
+      `${dropped > 0 ? ` (${dropped}개 버림)` : ''}` +
+      `, 입력 약 ${approxTokens + systemTokens} (메시지 ${approxTokens} + 시스템 ${systemTokens})` +
+      `, 출력 상한 ${maxTokens}, 예산 ${DEFAULT_CONTEXT_BUDGET}` +
+      `${finish ? ' · 마무리' : ''}`
     )
 
     // ★ Gemini는 역할을 번갈아 요구합니다 ★
@@ -105,7 +116,7 @@ export async function POST(req: NextRequest) {
       model,
       systemPrompt,
       jsonMode: true,
-      maxTokens: finish ? TOKENS_FINISH : TOKENS_PER_TURN,
+      maxTokens,
     })
 
     const turn: LessonTurn = parseLessonResponse(result.content)

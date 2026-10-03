@@ -53,19 +53,28 @@ export function estimateTokens(text: string): number {
 }
 
 /**
- * 기본 예산.
+ * 기본 예산 — 한 턴이 **메시지**에 쓸 수 있는 토큰.
  *
  * **모델의 컨텍스트 한도가 아니라 분당 토큰(TPM) 한도에 맞춘 값이다.**
- * 실측: groq `openai/gpt-oss-120b`의 한도는 8,000 TPM.
- * 컨텍스트 창이 128k여도 분당 8천이면 12,000 예산은 반드시 거절당합니다.
+ * groq `openai/gpt-oss-120b`의 한도는 8,000 TPM입니다
+ * (console.groq.com/docs/rate-limits, Developer Plan 기준).
+ * 컨텍스트 창이 128k여도 분당 8천이면 그 위는 반드시 거절당합니다.
  *
- * 그래서 6,000으로 둡니다 — 시스템 프롬프트와 출력(max_tokens 1024) 자리를 남기고,
- * 순간적으로 여러 요청이 겹칠 때도 버틸 수 있는 값입니다.
+ * 한 턴이 8,000을 통째로 쓰면 안 됩니다. TPM은 분당 **총량**이라,
+ * 같은 분에 요약 호출이 하나라도 더 붙으면 본 호출이 밀립니다.
+ * 그래서 실제 사용분은 7,000 이내로 두고 1,000을 여유로 남깁니다.
  *
- * 더 큰 모델·더 큰 한도를 쓰게 되면 이 상수를 올리되,
- * provider의 실제 TPM 한도를 먼저 확인하고 바꾸세요.
+ *   평시 턴:  시스템 300 + 메시지 4,300 + 출력 2,000 = 6,600
+ *   압축 턴:  (요약 3,000) + (시스템 300 + 메시지 2,000 + 출력 1,700) = 7,000
+ *
+ * 6,000 → 4,300으로 내린 이유는 출력을 1,024 → 2,000으로 올리기 위해서입니다.
+ * 합계는 7,024에서 6,600으로 오히려 줄었고, 그럼에도 답이 두 배로 깁니다.
+ * (lib/api/chat/route.ts의 CHAT_MAX_TOKENS 참고)
+ *
+ * provider를 바꾸면 이 상수를 바꿉니다 — 값은 provider의 실제 TPM에서 나옵니다.
+ * groq를 쓰는 한 8,000이 정답이고, 이를 넘기면 거절당합니다.
  */
-export const DEFAULT_CONTEXT_BUDGET = 6_000
+export const DEFAULT_CONTEXT_BUDGET = 4_300
 
 type ContentLike = { content: string; role?: string }
 

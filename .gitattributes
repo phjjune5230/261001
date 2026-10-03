@@ -1,0 +1,15 @@
+# 줄바꿈을 고정합니다.
+#
+# Windows에서 파일을 고치면 LF → CRLF로 바뀌고, git diff는 그 차이를
+# "내용이 바뀜"으로 잘못 보고합니다. 고친 줄 한 줄이 화면에 수백 줄로
+# 보이는 일이고, 그러면 diff 리뷰가 무의미해집니다.
+#
+# core.autocrlf는 사용자에 따라 다르고 저장소에 남지 않으므로
+# 저장소가 스스로 정하도록 합니다.
+* text=auto eol=lf
+
+# 예외 — Windows가 직접 실행하는 스크립트만 CRLF.
+# 이 셋은 없지만, 나중에 만들면 그때까지 이 규칙이 받쳐 줍니다.
+*.ps1 text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
