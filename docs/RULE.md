@@ -159,7 +159,11 @@ provider의 원본 JSON이 AI 대답처럼 보이던 것을 막기 위한 것입
 - 브랜치 `master`. 혼자 쓰는 개인 저장소라 분기 이력은 필요 없습니다.
 - 커밋 메시지: `v{버전} {요약}`
 - **판단이 필요하면 코드를 고치기 전에** 그 판단이 들어갈 코드 옆에 적습니다.
-- 검증은 `npm run lint`(경고 0) · `npx tsc --noEmit` · `npm run build` 통과 후에만.
+- 검증은 `npm run lint`(경고 0) · `npx tsc --noEmit` · `npm test` · `npm run build` 통과 후에만.
+  - **`npm test`가 없던 시기가 있었습니다.** 그때는 앞의 셋이 전부였는데, 셋 다 테스트가 아닙니다.
+    tsc와 lint는 "의도가 읽히는 코드"만 검사합니다. `lib/context.ts`의 `estimateTokens`가
+    나누는 수를 4에서 3으로 바꿔도 셋 다 통과하고, provider가 400을 내기까지 아무도
+    모릅니다. 실제로 그런 사고가 났습니다 (2026-10-01, groq "Requested 46197").
 - 커밋 전에 `git status`에 `.env` / `.env.local`이 없는지 확인합니다.
 
 | 버전 올릴 때 | 기준 |
