@@ -78,10 +78,9 @@ export const MODELS: Record<Provider, ModelInfo[]> = {
     // OpenRouter는 TPM 제한이 없습니다 (2026-10-03 확인).
     // 무료 모델에 분당 20회, 유료는 일 50~1,000회 한도가 따로 있습니다.
     // 유료 모델에 rpm을 적으면 그건 요금제 한도라 자주 바뀝니다 — null로 둡니다.
-    { id: 'openai/gpt-5.5', name: 'GPT-5.5', maxTokens: 2_000, tpm: null, rpm: null },
-    { id: 'openai/gpt-5.4', name: 'GPT-5.4', maxTokens: 2_000, tpm: null, rpm: null },
-    { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', maxTokens: 2_000, tpm: null, rpm: null },
-    { id: 'x-ai/grok-4.20', name: 'Grok 4.20', maxTokens: 2_000, tpm: null, rpm: null },
+    { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', name: 'nemotron-3-ultra-550b-a55b', maxTokens: 2_000, tpm: null, rpm: null },
+    { id: 'nvidia/nemotron-3.5-lightning:free', name: 'nemotron-3.5-lightning', maxTokens: 2_000, tpm: null, rpm: null },
+  
   ],
   groq: [
     // 2026-10-03 실측: console.groq.com/docs/rate-limits, Developer Plan
@@ -93,13 +92,13 @@ export const MODELS: Record<Provider, ModelInfo[]> = {
       rpm: 30,
     },
     // 20B의 한도는 확인하지 않았습니다. null로 두면 기본 예산을 씁니다.
-    { id: 'openai/gpt-oss-20b', name: 'GPT-OSS 20B', maxTokens: 2_000, tpm: null, rpm: null },
+    { id: 'qwen/qwen3.8-27b', name: 'QWEN3.8-27b', maxTokens: 2_000, tpm: 8000, rpm: 30 },
   ],
   gemini: [
     // Gemini free tier는 분당 토큰이 아니라 일별 호출 수가 걸립니다
     // (모델당 일 20~500회). 그래서 tpm/rpm 대신 rpm에도 이름이 맞지 않는
     // 제약이 따로 있습니다 — 여기 담지 않고 주석만 남깁니다.
-    { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', maxTokens: 2_000, tpm: null, rpm: null },
+    { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', maxTokens: 2_000, tpm: 250000, rpm: 15 },
   ],
 }
 
