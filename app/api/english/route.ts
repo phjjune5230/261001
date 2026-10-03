@@ -4,8 +4,8 @@ import {
   badRequest,
   hasValidToken,
   isKnownProvider,
+  providerError,
   unauthorized,
-  userFacingMessage,
 } from '@/lib/api'
 import {
   contextBudgetFor,
@@ -140,8 +140,8 @@ export async function POST(req: NextRequest) {
       approxTokens,
     })
   } catch (err: unknown) {
-    console.error('[english] provider 호출 실패:', err)
-    return NextResponse.json({ error: userFacingMessage(err) }, { status: 500 })
+    // 원본 오류는 남기지 않습니다 — 종류·provider·상태 코드만 남깁니다 (lib/api.ts).
+    return providerError(err, 'english')
   }
 }
 

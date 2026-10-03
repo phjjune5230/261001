@@ -30,10 +30,182 @@ const OWN_ERRORS = [
   /messages가 필요합니다/,
 ]
 
-export function userFacingMessage(err: unknown): string {
+/**
+ * ★ 오류 종류 ★
+ *
+ * 왜 이게 필요한가: 한때 모든 provider 실패를
+ * "잠시 후 다시 시도해주세요" 한 줄로 뭉개고 있었습니다. 그래서 401(키 오류)과
+ * 429(할당량 초과)와 500(provider 장애)이 사용자에게 똑같이 보였습니다.
+ * 원인을 고칠 사람이 그 문장을 보고 무엇을 고쳐야 하는지 알 수 없었습니다.
+ *
+ * 이제 분류는 두 사람을 동시에 돕습니다.
+ *   • 사용자는 왜 실패했는지 바로 알고, 무엇을 고칠지 압니다.
+ *   • 서버 로그는 kind를 남기므로 원인을 그대로 집계할 수 있습니다.
+ *
+ * ★ 원본 응답은 여전히 브라우저로 내보내지 않습니다 ★
+ * provider가 준 본문에는 API 키 지문이 들어간 적이 있습니다 (v0.2.0 사고).
+ * 여기서 만드는 메시지는 전부 우리가 지은 문장입니다 — provider 본문의
+ * 일부를 그대로 옮기지 않습니다.
+ */
+export type ErrorKind =
+  | 'config'    // 우리가 만든 설정 오류 — 사용자가 직접 고칠 수 있습니다
+  | 'auth'      // API 키가 없거나 틀림
+  | 'model'     // 그 모델을 provider가 모름 (폐기되었을 수 있음)
+  | 'quota'     // 일별·기간 할당량 소진
+  | 'rate'      // 분당 요청 또는 토큰 한도 초과
+  | 'credit'    // 잔액·결제 문제
+  | 'context'   // 입력이 컨텍스트 한도를 넘음
+  | 'policy'    // 안전 필터에 막힘
+  | 'timeout'   // 네트워크 지연·단절
+  | 'transient' // provider 일시 장애 (5xx)
+  | 'unknown'   // 분류 실패 — 예전처럼 한 문장으로 뭉개지 않기 위해 남겨둡니다
+
+/**
+ * 판정표. **위에서부터 처음 맞는 것이 이깁니다.**
+ *
+ * 순서가 의미입니다. 402는 잔액인데 본문에 "quota"가 같이 들어올 수 있고,
+ * 429는 할당량("quota")과 분당 한도("rate limit")가 같은 상태 코드입니다.
+ * 그래서 더 구체적인 쪽을 앞에 둡니다.
+ *
+ * 정규식은 lib/llm.ts가 만드는 `provider + 상태 코드 + 본문 앞부분`을 대상으로 합니다.
+ * 그 형식이 바뀌면 여기서 조용히 틀어집니다 — 그래서 unknown을 남겨 둡니다.
+ */
+const CLASSIFY: { kind: ErrorKind; re: RegExp; message: string }[] = [
+  {
+    kind: 'credit',
+    re: /\b402\b|billing|insufficient.{0,10}credit|payment|잔액/i,
+    message: 'API 크레딧이 부족합니다. provider의 사용량과 결제 상태를 확인해주세요.',
+  },
+  {
+    kind: 'auth',
+    re: /\b401\b|unauthorized|invalid.{0,10}api.{0,3}key|authentication/i,
+    message: 'API 키가 올바르지 않습니다. .env.local의 키를 확인해주세요.',
+  },
+  {
+    kind: 'model',
+    re: /\b404\b|model.{0,3}not.{0,3}found|is not found|does not exist|deprecat|폐기/i,
+    message: 'provider가 그 모델을 모릅니다. 모델 ID가 폐기되었거나 오타입니다. ' +
+      'lib/models.ts의 목록을 확인해주세요.',
+  },
+  {
+    kind: 'quota',
+    re: /quota|exceeded your current|per day|daily limit|requests per day/i,
+    message: '사용 한도에 도달했습니다. 기간이 지나거나 할당량을 늘려야 합니다.',
+  },
+  {
+    kind: 'rate',
+    re: /\b429\b|rate.{0,3}limit|too many requests|requests per minute|tokens per min/i,
+    message: '분당 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
+  },
+  {
+    kind: 'context',
+    re: /context.{0,3}length|maximum context|too many tokens|reduce the length|token count|too long/i,
+    message: '입력이 모델의 컨텍스트 한도를 넘었습니다. 앞 대화를 줄여주세요.',
+  },
+  {
+    kind: 'policy',
+    re: /safety|blocked|content.{0,3}policy|responsible.{0,3}ai|prohibited/i,
+    message: '안전 정책에 막힌 응답입니다. 표현을 조금 바꿔주세요.',
+  },
+  {
+    kind: 'timeout',
+    re: /ETIMEDOUT|ECONNRESET|ECONNREFUSED|fetch failed|aborted|socket hang up|network/i,
+    message: 'provider에 연결하지 못했습니다. 네트워크를 확인해주세요.',
+  },
+  {
+    kind: 'transient',
+    re: /\b50[0234]\b|overloaded|unavailable|internal server|temporarily/i,
+    message: 'provider가 일시적으로 응답하지 않습니다. 잠시 후 다시 시도해주세요.',
+  },
+]
+
+/**
+ * provider 이름과 HTTP 상태 코드만 원본에서 꺼냅니다.
+ *
+ * ★ 원본 본문은 어디에도 옮기지 않습니다 ★
+ * lib/llm.ts가 메시지에 provider 본문 앞부분을 넣어 두는데, 그 안에는
+ * API 키 지문이 들어간 적이 있습니다 (v0.2.0 사고). 지문은 브라우저로도,
+ * 서버 로그로도 나가지 않습니다.
+ *
+ * 그런데 상태 코드만 봐도 원인의 반은 특정됩니다 — "groq가 429였다"와
+ * "groq가 401이었다"는 완전히 다른 문제입니다. 상태 코드와 provider 이름은
+ * credential이 아니므로 이 둘만 남깁니다.
+ *
+ * lib/llm.ts가 만드는 형태는 `provider 상태코드 error: 본문`입니다.
+ * 다른 provider(Gemini)는 SDK가 던지므로 형태가 다르고, 그래도 모르는
+ * 경우를 만들지 않으므로 null로 두고 꾸며내지 않습니다.
+ */
+function safeSource(msg: string): { provider: string | null; status: number | null } {
+  const m = /^(openrouter|groq|gemini)\s+(\d{3})\b/.exec(msg)
+  if (m) return { provider: m[1], status: Number(m[2]) }
+  return { provider: null, status: null }
+}
+
+export type ErrorSummary = {
+  kind: ErrorKind
+  message: string
+  /** provider 이름. 알 수 없으면 null */
+  provider: string | null
+  /** HTTP 상태 코드. 알 수 없으면 null */
+  status: number | null
+}
+
+/**
+ * 오류를 종류와 안전한 메시지로 바꿉니다.
+ *
+ * 반환되는 message는 전부 여기서 지은 문장입니다 — provider 원본을 옮기지 않습니다
+ * (RULE.md 1절). kind는 그대로 응답에 실려 내려갑니다.
+ */
+export function describeError(err: unknown): ErrorSummary {
   const msg = err instanceof Error ? err.message : ''
-  if (OWN_ERRORS.some((re) => re.test(msg))) return msg
-  return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.'
+  const { provider, status } = safeSource(msg)
+
+  if (OWN_ERRORS.some(re => re.test(msg))) {
+    return { kind: 'config', message: msg, provider, status }
+  }
+
+  for (const { kind, re, message } of CLASSIFY) {
+    if (re.test(msg)) return { kind, message, provider, status }
+  }
+
+  return {
+    kind: 'unknown',
+    message: '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.',
+    provider,
+    status,
+  }
+}
+
+/** 예전 이름 — 분류가 아니라 문장만 필요할 때. */
+export function userFacingMessage(err: unknown): string {
+  return describeError(err).message
+}
+
+/**
+ * provider 오류를 로그에 남기고 안전하게 내려보냅니다.
+ *
+ * ★ 두 라우트가 한 곳을 보게 하는 이유 ★
+ * /api/chat 과 /api/english 는 같은 오류를 같은 방식으로 처리해야 합니다.
+ * 한쪽만 고치고 한쪽을 잊으면 어느 기능이 왜 조용히 이상한 말을 하는지
+ * 찾을 수 없습니다. 로그 접두사만 넘기면 나머지는 여기서 같아집니다.
+ *
+ * ★ 로그에는 종류·provider·상태 코드만 씁니다 ★
+ * 원본 오류(`err`)는 인자로도 받지 않습니다. 로그에 받아 적는 순간
+ * provider 본문이 그대로 남고, 그 안에 키 지문이 있을 수 있습니다
+ * (v0.2.0 사고). 분류 결과만 남기면 원인 집계에는 충분하고 누출은 없습니다.
+ *
+ * 응답에는 kind를 함께 넣습니다. 원본은 브라우저로 못 보내니 (키 지문),
+ * 대신 **우리가 매긴 이름**은 보냅니다. 브라우저 개발자도구에서도 같은 정보를
+ * 볼 수 있어야 서버 콘솔에 붙이지 않고도 원인을 알 수 있습니다.
+ */
+export function providerError(err: unknown, label: string): NextResponse {
+  const { kind, message, provider, status } = describeError(err)
+  console.error(
+    `[${label}] provider 호출 실패: kind=${kind}` +
+    `${provider ? ` provider=${provider}` : ''}` +
+    `${status ? ` status=${status}` : ''}`
+  )
+  return NextResponse.json({ error: message, kind }, { status: 500 })
 }
 
 /** 토큰이 없으면 즉시 401. 본문은 읽지 않는다. */

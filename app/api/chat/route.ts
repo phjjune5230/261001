@@ -5,8 +5,8 @@ import {
   hasValidToken,
   isKnownProvider,
   isUuid,
+  providerError,
   unauthorized,
-  userFacingMessage,
 } from '@/lib/api'
 import { countDropped, contextBudgetFor, estimateTokens } from '@/lib/context'
 import { limitsFor } from '@/lib/models'
@@ -181,9 +181,10 @@ export async function POST(req: NextRequest) {
       summary: summary || null,
     })
   } catch (err: unknown) {
-    // provider가 준 원본 응답(키 지문 등이 포함될 수 있음)은 서버 콘솔에만 남긴다.
-    // 그대로 내려보내면 브라우저에 노출되고, 더 나쁘게는 AI 응답과 구분되지 않는다.
-    console.error('[chat] provider 호출 실패:', err)
-    return NextResponse.json({ error: userFacingMessage(err) }, { status: 500 })
+    // 원본 오류는 로그에도 응답으로도 내보내지 않습니다 (RULE.md 1절).
+    // provider 본문에는 API 키 지문이 들어간 적이 있습니다 (v0.2.0 사고).
+    // 종류·provider·상태 코드만 남기면 원인 집계에는 충분하고 누출은 없습니다.
+    // 분류표와 그 근거는 lib/api.ts에 있습니다.
+    return providerError(err, 'chat')
   }
 }
