@@ -8,11 +8,12 @@ import {
   userFacingMessage,
 } from '@/lib/api'
 import {
-  DEFAULT_CONTEXT_BUDGET,
+  contextBudgetFor,
   keepRecentMessages,
   countDropped,
   estimateTokens,
 } from '@/lib/context'
+import { limitsFor } from '@/lib/models'
 import {
   FINISH_INSTRUCTION,
   LESSON_SYSTEM_PROMPT,
@@ -87,18 +88,25 @@ export async function POST(req: NextRequest) {
     )
     const systemTokens = estimateTokens(systemPrompt)
 
+    // 고른 모델의 한도에서 예산과 출력 상한을 정합니다 (lib/models.ts).
+    // 이 라우트의 TOKENS_* 상수는 "이 기능이 얼마나 필요로 하는가"이고,
+    // limits.maxTokens는 "모델이 최대 얼마를 받아 주는가"입니다. 작은 쪽을 씁니다.
+    const limits = limitsFor(provider, typeof model === 'string' ? model : undefined)
+    const budget = contextBudgetFor(limits.tpm, limits.maxTokens)
+    const wantTokens = finish ? TOKENS_FINISH : TOKENS_PER_TURN
+    const maxTokens = Math.min(wantTokens, limits.maxTokens)
+
     const trimmed = keepRecentMessages(
       messages as LLMMessage[],
-      DEFAULT_CONTEXT_BUDGET - systemTokens
+      budget - systemTokens
     )
     const dropped = countDropped(messages.length, trimmed.length)
     const approxTokens = trimmed.reduce((sum, m) => sum + estimateTokens(m.content || ''), 0)
-    const maxTokens = finish ? TOKENS_FINISH : TOKENS_PER_TURN
     console.log(
       `[english] ${messages.length} → ${trimmed.length} 메시지` +
       `${dropped > 0 ? ` (${dropped}개 버림)` : ''}` +
       `, 입력 약 ${approxTokens + systemTokens} (메시지 ${approxTokens} + 시스템 ${systemTokens})` +
-      `, 출력 상한 ${maxTokens}, 예산 ${DEFAULT_CONTEXT_BUDGET}` +
+      `, 출력 상한 ${maxTokens}, 예산 ${budget}` +
       `${finish ? ' · 마무리' : ''}`
     )
 

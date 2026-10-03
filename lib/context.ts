@@ -73,8 +73,53 @@ export function estimateTokens(text: string): number {
  *
  * provider를 바꾸면 이 상수를 바꿉니다 — 값은 provider의 실제 TPM에서 나옵니다.
  * groq를 쓰는 한 8,000이 정답이고, 이를 넘기면 거절당합니다.
+ *
+ * ★ 이제 이 값은 "기본값"입니다 ★
+ * 모델의 한도를 아는 곳에서는 위 수식을 씁니다 (contextBudgetFor).
+ * 여기 남는 이유는 한도를 모르는 모델 때문입니다 — 한도가 없거나 확인 전이면
+ * (lib/models.ts의 ModelInfo) 보수는 이 값으로 돌아갑니다.
  */
 export const DEFAULT_CONTEXT_BUDGET = 4_300
+
+/**
+ * 시스템 프롬프트에 남겨 둘 몫.
+ *
+ * chat은 사용자가 자유롭게 쓰는 텍스트라 길이를 알 수 없습니다
+ * (app/api/chat/route.ts의 MAX_SYSTEM_PROMPT_CHARS에서 자릅니다).
+ * 영어는 서버가 고정해서 붙입니다 — LESSON_SYSTEM_PROMPT가 약 965토큰입니다.
+ * 여기서는 그중 작은 쪽을 가정합니다. 큰 쪽을 가정하면 예산이 모자랍니다.
+ */
+const SYSTEM_TOKEN_RESERVE = 300
+
+/**
+ * ★ 안전 여유 ★
+ *
+ * TPM은 분당 총량이라 같은 분에 요약 호출이 하나라도 붙으면 본 호출이 밀립니다.
+ * 이만큼을 남기지 않으면 평시 턴은 되다가 압축 턴에서 거절당합니다.
+ * (lib/compaction.ts의 MIN_BUDGET_FOR_MESSAGES가 바닥값을 두는 것과 같은 이유)
+ */
+const TPM_SAFETY_MARGIN = 1_400
+
+/** 파생 결과가 이보다 작으면 한도 정보가 잘못된 것입니다. */
+const BUDGET_FLOOR = 1_500
+
+/**
+ * ★ 한 턴이 **메시지**에 쓸 수 있는 토큰을 모델의 한도에서 계산합니다 ★
+ *
+ *    예산 = tpm − maxTokens − 시스템여유 − 안전여유
+ *         = 8000 −  2000  −    300   −    1400   = 4,300
+ *
+ * 상수를 손으로 맞추지 않아도 되고, provider를 바꾸면 예산이 저절로 움직입니다.
+ * 4,300이 손으로 맞춘 값과 정확히 일치하므로, 지금 숫자가 맞았다는 뜻이기도 합니다.
+ *
+ * TPM을 모르면 null을 넘기고 기본값을 돌려줍니다 — 모르는 한도를 지어내는 것보다
+ * 이미 검증된 기본값이 낫습니다 (lib/models.ts의 ModelInfo 참고).
+ */
+export function contextBudgetFor(tpm: number | null, maxTokens: number): number {
+  if (tpm === null || !Number.isFinite(tpm) || tpm <= 0) return DEFAULT_CONTEXT_BUDGET
+  const derived = tpm - maxTokens - SYSTEM_TOKEN_RESERVE - TPM_SAFETY_MARGIN
+  return Math.max(BUDGET_FLOOR, derived)
+}
 
 type ContentLike = { content: string; role?: string }
 

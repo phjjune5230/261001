@@ -8,7 +8,8 @@ import {
   unauthorized,
   userFacingMessage,
 } from '@/lib/api'
-import { DEFAULT_CONTEXT_BUDGET, countDropped, estimateTokens } from '@/lib/context'
+import { countDropped, contextBudgetFor, estimateTokens } from '@/lib/context'
+import { limitsFor } from '@/lib/models'
 import {
   attachSummary,
   planCompaction,
@@ -18,16 +19,15 @@ import {
 } from '@/lib/compaction'
 
 /**
- * 출력 상한.
+ * 출력 상한은 여기서 더 정하지 않습니다 — lib/models.ts의 ModelInfo.maxTokens입니다.
  *
- * 이 값이 1,024였고, 그래서 답변은 늘 중간에서 잘렸습니다. TPM이 허용하는 만큼
- * 이 수를 정합니다 — 그래서 메시지 예산을 그만큼 내렸습니다
- * (lib/context.ts의 DEFAULT_CONTEXT_BUDGET 참고).
+ * 이 파일에 2,000을 하드코딩했던 시기가 있었습니다. 문제는 그 숫자가 어디서
+ * 왔는지 아무도 모른다는 점이었고, provider를 바꿔도 따라가지 않았습니다.
+ * 그래서 고치는 사람이 값을 만질 수 있는 곳으로 옮겼습니다.
  *
  * 압축이 걸린 턴에는 더 작게 줍니다. 그 턴은 같은 분에 요약 호출이 하나 더 나가므로
- * 두 요청의 합이 8,000 이하여야 하기 때문입니다.
+ * 두 요청의 합이 TPM 이하여야 하기 때문입니다.
  */
-const CHAT_MAX_TOKENS = 2000
 const COMPACTION_MAX_TOKENS = 1700
 
 /**
@@ -93,18 +93,33 @@ export async function POST(req: NextRequest) {
         ? rawSystem.slice(0, MAX_SYSTEM_PROMPT_CHARS)
         : rawSystem
 
+    // ★ 고른 모델의 한도로 예산을 정합니다 ★
+    // 손으로 맞춘 상수가 여기 없으므로 provider를 바꿔도 값이 따라갑니다.
+    // 한도를 모르는 모델이면 기본값으로 돌아갑니다 (lib/context.ts).
+    const limits = limitsFor(provider, typeof model === 'string' ? model : undefined)
+    const budget = contextBudgetFor(limits.tpm, limits.maxTokens)
+
     let plan = planCompaction(
       messages as LLMMessage[],
       state,
-      DEFAULT_CONTEXT_BUDGET - estimateTokens(system)
+      budget - estimateTokens(system)
     )
 
     // ★ 압축이 걸린 턴은 예산을 한 번 더 좁힙니다 ★
-    // 그 턴에는 요약 호출이 하나 더 나가므로, 두 요청의 합이 8,000 이하여야 합니다.
+    // 그 턴에는 요약 호출이 하나 더 나가므로, 두 요청의 합이 TPM 이하여야 합니다.
     // (planCompaction이 MIN_BUDGET_FOR_MESSAGES로 바닥을 두므로 음수가 들어가도 안전합니다)
     if (plan.shouldSummarize) {
-      plan = planCompaction(messages as LLMMessage[], state, COMPACTION_CONTEXT_BUDGET)
+      plan = planCompaction(
+        messages as LLMMessage[],
+        state,
+        Math.min(COMPACTION_CONTEXT_BUDGET, budget)
+      )
     }
+
+    // 압축 턴은 같은 분에 요약 호출이 하나 더 나가므로 더 작게 줍니다.
+    const maxTokens = plan.shouldSummarize
+      ? Math.min(COMPACTION_MAX_TOKENS, limits.maxTokens)
+      : limits.maxTokens
 
     let summary = plan.summary
     let compacted = false
@@ -136,14 +151,14 @@ export async function POST(req: NextRequest) {
     const context = attachSummary(compacted ? { ...plan, summary } : plan)
     const dropped = countDropped(messages.length, plan.context.length)
     const approxTokens = context.reduce((sum, m) => sum + estimateTokens(m.content || ''), 0)
-    const maxTokens = plan.shouldSummarize ? COMPACTION_MAX_TOKENS : CHAT_MAX_TOKENS
     console.log(
       `[chat] ${messages.length} → ${plan.context.length} 메시지` +
       `${dropped > 0 ? ` (${dropped}개 압축)` : ''}` +
       `${compacted ? ', 요약 갱신' : ''}` +
       `${summary ? `, 요약 ${estimateTokens(summary)} 토큰 포함` : ''}` +
-      `, 입력 약 ${approxTokens + estimateTokens(system)} (예산 ${DEFAULT_CONTEXT_BUDGET}, ` +
-      `출력 상한 ${maxTokens})`
+      `, 입력 약 ${approxTokens + estimateTokens(system)} (예산 ${budget}, ` +
+      `출력 상한 ${maxTokens}, 모델 ${limits.name}` +
+      `${limits.tpm ? ` · TPM ${limits.tpm}` : ' · TPM 미상'})`
     )
 
     const result = await callLLM(provider, context, {
