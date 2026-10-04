@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { clearToken } from '@/lib/auth-client'
 import Icon, { type IconName } from '@/components/Icon'
+import ThemeToggle from '@/components/ThemeToggle'
 
 type Card = {
   href?: string
@@ -36,13 +37,21 @@ export default function HomePage() {
           <h1 className="font-display text-display tracking-tight">First App</h1>
           <p className="text-meta text-ink-muted mt-2">June&apos;s AI Assistant</p>
         </div>
-        <button
-          type="button"
-          onClick={clearToken}
-          className="shrink-0 border border-line rounded-md bg-surface-1 shadow-edge px-3 py-1.5 text-meta text-ink-muted hover:bg-surface-3 hover:text-ink transition-colors"
-        >
-          잠금
-        </button>
+        {/*
+          테마 전환은 잠금 버튼 옆에 둡니다.
+          둘 다 "화면을 바꾸는" 버튼이라 자리가 같고, 갇혔을 때도 여기서 나옵니다.
+          (사용자 요청 — 다른 화면에는 두지 않았습니다. 홈이 진입점입니다)
+        */}
+        <div className="shrink-0 flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={clearToken}
+            className="border border-line rounded-md bg-surface-1 shadow-edge px-3 py-1.5 text-meta text-ink-muted hover:bg-surface-3 hover:text-ink transition-colors"
+          >
+            잠금
+          </button>
+        </div>
       </header>
 
       <section className="w-full max-w-5xl grid gap-3 md:grid-cols-2">

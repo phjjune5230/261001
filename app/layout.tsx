@@ -63,6 +63,31 @@ export const metadata: Metadata = {
   description: "June's Personal AI Assistant",
 }
 
+/**
+ * ★ 첫 페인트 전에 테마를 심습니다 ★
+ *
+ * 없으면 어두운 테마를 쓰는 사람이 매번 **흰 화면을 0.5초 보고** 검은 화면으로
+ * 바뀝니다. 서버가 보내는 HTML은 테마를 모르기 때문에, 그때까지는 기본값
+ * (globals.css의 `:root` = 밝은 쪽)이 그려집니다.
+ *
+ * 그래서 <head> 안에서 <html>의 속성을 먼저 바꿉니다. React가 개입하기 전이라
+ * 깜빡임이 없습니다.
+ *
+ * ★ 문자열을 여기저기서 두 번 적지 마세요 ★
+ * 이 스크립트와 components/ThemeToggle.tsx의 저장 키가 같아야 합니다.
+ * 키를 바꾸려면 두 곳을 같이 고쳐야 합니다.
+ *
+ * 실패해도 앱은 돌아갑니다 — localStorage를 못 읽는 환경(사생활 모드)에서는
+ * 기본값(밝게)이 그대로 쓰입니다. try/catch로 감싼 이유이고, 에러로 페이지가
+ * 죽는 일은 없습니다.
+ */
+const themeBootstrap = `
+try {
+  var t = localStorage.getItem('theme');
+  if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+} catch (e) {}
+`
+
 export default function RootLayout({
   children,
 }: {
@@ -72,7 +97,15 @@ export default function RootLayout({
     <html
       lang="ko"
       className={`${plexSans.variable} ${plexMono.variable} ${pretendard.variable}`}
+      suppressHydrationWarning
     >
+      <head>
+        {/*
+          dangerouslySetInnerHTML은 여기 **밖에** 쓰지 않습니다.
+          우리가 작성한 상수 문자열이고, 사용자 입력이 들어갈 자리가 아닙니다.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
+      </head>
       <body className="bg-page text-ink antialiased">
         {/* 모든 화면 라우트를 거친다. /chat 같은 주소 직행도 막힌다. */}
         <AuthGate>{children}</AuthGate>
