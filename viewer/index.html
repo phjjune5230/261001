@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>과거 대화 보기</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script>
+      // 첫 페인트 전에 테마를 심습니다. 안 하면 흰 화면이 0.5초 보입니다.
+      // (app/layout.tsx의 themeBootstrap과 같은 방식 · 같은 저장 키)
+      try {
+        var saved = localStorage.getItem('theme');
+        var t = saved === 'dark' || saved === 'light'
+          ? saved
+          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>과거 대화</h1>
+        <p class="muted">읽기 전용 — 저장·수정·삭제 경로는 없습니다</p>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" id="refresh" class="btn">새로고침</button>
+        <button type="button" id="theme" class="btn" title="밝게 / 어둡게">테마</button>
+      </div>
+    </header>
+
+    <div id="fatal" class="fatal" hidden></div>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab is-active" data-kind="chat" role="tab">채팅</button>
+          <button type="button" class="tab" data-kind="english" role="tab">영어</button>
+        </div>
+        <input
+          type="search"
+          id="search"
+          class="search"
+          placeholder="제목으로 찾기"
+          autocomplete="off"
+          aria-label="제목 검색"
+        />
+        <div id="list" class="list"></div>
+      </aside>
+
+      <section class="viewer">
+        <div id="head" class="viewer-head">
+          <h2>왼쪽에서 대화를 고르세요</h2>
+        </div>
+        <div id="thread" class="thread"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,351 @@
+/* ─────────────────────────────────────────────
+   과거 대화 뷰어 — 스타일
+
+   색 값은 app/globals.css 의 :root / [data-theme='dark'] 를 그대로 옮긴 것입니다.
+   앱과 화면이 달라 보이지 않게 하려고 일부러 같은 이름을 썼습니다.
+   (두 곳이 따로 놀면 한쪽만 고쳐지는 사고가 생깁니다)
+
+   이 파일은 빌드되지 않습니다 — 순수 CSS 파일입니다.
+   ───────────────────────────────────────────── */
+
+:root {
+  --page: #f7f7f5;
+  --surface-1: #ffffff;
+  --surface-2: #eeeeea;
+  --surface-3: #e4e4df;
+
+  --line: #e0e0da;
+  --line-strong: #cdcdc6;
+
+  --ink: #17171a;
+  --ink-muted: #52524d;
+  --ink-faint: #6b6b64;
+
+  --bubble-me: #eaeae4;
+  --bubble-them: #ffffff;
+
+  --accent: #5c6b00;
+  --danger: #dc2626;
+
+  --edge-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  --edge-shadow-strong: 0 1px 3px rgb(0 0 0 / 0.08);
+
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
+  --font-display: var(--font-body);
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+:root[data-theme='dark'] {
+  --page: #0b0b0b;
+  --surface-1: #131313;
+  --surface-2: #191919;
+  --surface-3: #212121;
+
+  --line: #232323;
+  --line-strong: #2e2e2e;
+
+  --ink: #e9e9e5;
+  --ink-muted: #b8b8b1;
+  --ink-faint: #9c9c95;
+
+  --bubble-me: #1f1f1f;
+  --bubble-them: #0e0e0e;
+
+  --accent: #e8ff47;
+  --danger: #ef4444;
+
+  --edge-shadow: inset 0 1px 0 rgb(255 255 255 / 0.055);
+  --edge-shadow-strong: inset 0 1px 0 rgb(255 255 255 / 0.07);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--page);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+}
+
+.muted {
+  color: var(--ink-muted);
+}
+
+.faint {
+  color: var(--ink-faint);
+}
+
+/* ── 상단 ─────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-1);
+  flex: 0 0 auto;
+}
+
+.topbar-title h1 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.topbar-title p {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.btn {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-muted);
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 11px;
+  cursor: pointer;
+  box-shadow: var(--edge-shadow);
+}
+
+.btn:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+/* ── 실패 안내 ─────────────────────────────── */
+.fatal {
+  margin: 16px 24px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--surface-1);
+}
+
+.fatal code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ── 배치 ─────────────────────────────────── */
+.layout {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  min-height: 0;
+}
+
+@media (max-width: 760px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+}
+
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: var(--surface-1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+@media (max-width: 760px) {
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    max-height: 42vh;
+  }
+}
+
+/* ── 탭 ───────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 14px 16px 10px;
+}
+
+.tab {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.tab.is-active {
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 40%, transparent);
+  color: var(--ink);
+}
+
+.search {
+  font: inherit;
+  font-size: 13px;
+  margin: 0 16px 10px;
+  padding: 7px 10px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.search::placeholder {
+  color: var(--ink-faint);
+}
+
+.search:focus {
+  outline: 1px solid var(--line-strong);
+}
+
+/* ── 대화 목록 ─────────────────────────────── */
+.list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 8px 16px;
+}
+
+.row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 9px 10px;
+  margin-bottom: 2px;
+}
+
+.row:hover {
+  background: var(--surface-3);
+}
+
+.row.is-active {
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 40%, transparent);
+}
+
+.row-title {
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.row-meta {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 3px;
+  font-family: var(--font-mono);
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--ink-faint);
+  padding: 16px 10px;
+  line-height: 1.6;
+}
+
+/* ── 대화 본문 ─────────────────────────────── */
+.viewer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.viewer-head {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+
+.viewer-head h2 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  margin: 0;
+  font-weight: 500;
+}
+
+.viewer-head .row-meta {
+  margin-top: 4px;
+}
+
+.thread {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px 24px 40px;
+}
+
+.bubble {
+  max-width: 74%;
+  margin-bottom: 12px;
+  padding: 10px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  box-shadow: var(--edge-shadow);
+  background: var(--bubble-them);
+}
+
+.bubble.is-me {
+  margin-left: auto;
+  background: var(--bubble-me);
+}
+
+@media (max-width: 760px) {
+  .bubble {
+    max-width: 92%;
+  }
+}
+
+.bubble-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-bottom: 5px;
+  display: flex;
+  gap: 8px;
+}
+
+.bubble-content {
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
