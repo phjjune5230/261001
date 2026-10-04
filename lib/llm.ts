@@ -14,6 +14,24 @@ export type LLMResponse = {
   model: string
 }
 
+/**
+ * "한 번만 찔러보기" 용 출력 상한의 **상한선**.
+ *
+ * 두 곳에서 씁니다 — 모델 시험(`/api/models/test`)과 유지 점검(cron).
+ * RULE.md 2절("정의는 한 곳에만")에 따라 여기 둡니다. 두 값을 따로 가지면
+ * 어느 쪽이 커졌을 때 다른 쪽이 모릅니다.
+ *
+ * ★ 왜 상한선이 필요한가 ★
+ * 추론(reasoning) 모델은 본문을 쓰기 전에 reasoning 토큰을 씁니다. 상한이
+ * 작으면 거기가 다 먹고 빈 본문이 돌아옵니다 (2026-10-04, gpt-oss-120b).
+ * 그래서 "연결 확인" 목적인데 **연결이 안 된 것처럼 보이는** 상황이 생겼습니다.
+ *
+ * ★ 왜 실제 maxTokens를 쓰는가 — 하드코딩하지 않는 이유 ★
+ * 그 값은 각자 `limitsForModel()`로 가져옵니다. 시험이 채팅과 다른 값으로
+ * 도는 순간, 시험 결과가 거짓말을 합니다.
+ */
+export const PROBE_TOKEN_CEILING = 512
+
 const PROVIDER_CONFIG: Record<Provider, { apiKey: string; defaultModel: string }> = {
   openrouter: { apiKey: process.env.OPENROUTER_API_KEY || '', defaultModel: defaultModelFor('openrouter') },
   groq:        { apiKey: process.env.GROQ_API_KEY || '', defaultModel: defaultModelFor('groq') },

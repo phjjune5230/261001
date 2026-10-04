@@ -10,7 +10,8 @@
  *  여기서 한 번 쏴보면 그 자리에서 kind가 'model'로 나옵니다.
  *
  *  ★ 이 라우트는 provider를 실제로 호출합니다 ★
- *  호출만큼 비용이 듭니다. 그래서 최소로만 — 16토큰, 짧은 한마디.
+ *  호출만큼 비용이 듭니다. 그래서 최소로만 — 짧은 한마디, 그리고
+ *  `PROBE_TOKEN_CEILING`(lib/llm.ts)만큼에서 잘라냅니다.
  *
  *  규칙은 다른 라우트와 같습니다: 토큰 먼저 검사, 원본 오류는 브라우저로 안 보냅니다.
  */
@@ -19,21 +20,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { badRequest, hasValidToken, isKnownProvider, unauthorized } from '@/lib/api'
 import { describeError } from '@/lib/api'
 import { limitsForModel } from '@/lib/model-registry'
-import { callLLM } from '@/lib/llm'
+import { callLLM, PROBE_TOKEN_CEILING } from '@/lib/llm'
 import type { Provider } from '@/lib/llm'
-
-/**
- * 시험에 쓸 출력 상한의 **상한선**입니다.
- *
- * ★ 실제 값은 그 모델에 등록된 maxTokens를 씁니다 ★
- * 시험이 답해야 하는 질문은 "이 모델이 채팅에서 되나"입니다.
- * 그런데 시험이 다른 값을 쓰면 답이 달라집니다 — 실제로 16토큰에서는
- * 추론 모델(gpt-oss-120b)이 실패하고 비추론 모델(qwen3.8-27b)은 통과했습니다.
- * 시험이 실제보다 불리한 조건이면 결과가 거짓말을 합니다.
- *
- * 그래서 등록값을 쓰되, 무모하게 큰 값으로 비용이 새지 않게 여기서 자릅니다.
- */
-const PROBE_TOKEN_CEILING = 512
 
 const PROBE_PROMPT = 'Hi'
 

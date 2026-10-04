@@ -52,6 +52,15 @@
   **secret은 하나도 필요 없습니다.** 네 명령은 전부 환경 변수 없이 돕니다.
   provider 키를 CI에 넣으면 오히려 위험해집니다.
 
+  ★ 유지 점검 cron과 **다른 것**입니다 ★
+  `app/api/cron/keepalive`는 Vercel Cron으로 돕니다 (`vercel.json`, v0.17.0).
+  provider 키와 Supabase 키가 필요하므로 GitHub Actions로 옮기지 않았습니다 —
+  옮기려면 다섯 개의 키를 GitHub Secrets에 다시 넣어야 하고,
+  `SUPABASE_SERVICE_ROLE_KEY`가 사는 곳이 두 군데가 됩니다.
+  **기준은 단순합니다 — secret이 걸리는 업무는 Vercel, 안 걸리는 업무는 Actions.**
+  (GitHub CLI인 `gh`가 이 PC에 없어 Actions 시크릿은 이 시점에 직접 확인할 수
+  없었습니다. 넣으시려면 `gh secret list` 또는 저장소 Settings로 보셔야 합니다.)
+
 ## 데이터베이스
 
 - **마이그레이션 기록 방식** — 지금은 실행 여부를 확인할 방법이 없습니다.
