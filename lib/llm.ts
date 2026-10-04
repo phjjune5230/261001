@@ -18,19 +18,27 @@ export type LLMResponse = {
  * "한 번만 찔러보기" 용 출력 상한의 **상한선**.
  *
  * 두 곳에서 씁니다 — 모델 시험(`/api/models/test`)과 유지 점검(cron).
- * RULE.md 2절("정의는 한 곳에만")에 따라 여기 둡니다. 두 값을 따로 가지면
- * 어느 쪽이 커졌을 때 다른 쪽이 모릅니다.
+ * RULE.md 2절("정의는 한 곳에만")에 따라 여기 둡니다.
  *
- * ★ 왜 상한선이 필요한가 ★
- * 추론(reasoning) 모델은 본문을 쓰기 전에 reasoning 토큰을 씁니다. 상한이
- * 작으면 거기가 다 먹고 빈 본문이 돌아옵니다 (2026-10-04, gpt-oss-120b).
- * 그래서 "연결 확인" 목적인데 **연결이 안 된 것처럼 보이는** 상황이 생겼습니다.
+ * ★ 왜 실제 maxTokens와 같은 값인가 ★
+ * 채팅은 모델에 등록된 maxTokens를 그대로 줍니다. 여기서 더 작게 자르면
+ * **시험은 실패하는데 채팅은 되는** 상태가 생기고, 그건 사용자가 고칠 수 없는
+ * 잘못된 신호입니다 — "연결 안 됐다"는 말이 사실이 아니게 되니까요.
  *
- * ★ 왜 실제 maxTokens를 쓰는가 — 하드코딩하지 않는 이유 ★
- * 그 값은 각자 `limitsForModel()`로 가져옵니다. 시험이 채팅과 다른 값으로
- * 도는 순간, 시험 결과가 거짓말을 합니다.
+ * 실제로 그렇게 굴렸습니다. 2026-10-05, 이 값이 512일 때
+ * openrouter/nemotron-3-ultra-550b가 여기서 실패했습니다. 같은 모델로
+ * 실제 채팅을 보내니 정상 응답이 왔습니다 — 모델이 아니라 시험이 거짓말을 한 것이죠.
+ * (추론 모델이 reasoning 토큰에 상한을 다 쓰는 문제. 2026-10-04 gpt-oss-120b와 같은 원인)
+ *
+ * 그래서 이 값은 lib/models.ts의 등록값과 **같게** 둡니다.
+ *
+ * ★ 상한선을 두는 이유 — 비용이 새지 않게 ★
+ * 목록에 없는 모델을 직접 입력하면 UNKNOWN_MODEL(2000)이 불어옵니다.
+ * 상한선이 없으면 provider가 선언한 수십만 토큰을 그대로 신뢰하게 되고,
+ * 추론 모델이 실제로 그만큼 쓸 수 있습니다. max_tokens는 예약이 아니라 한계지만,
+ * 한계가 크면 요금이 새므로 여기서 막습니다.
  */
-export const PROBE_TOKEN_CEILING = 512
+export const PROBE_TOKEN_CEILING = 2_000
 
 const PROVIDER_CONFIG: Record<Provider, { apiKey: string; defaultModel: string }> = {
   openrouter: { apiKey: process.env.OPENROUTER_API_KEY || '', defaultModel: defaultModelFor('openrouter') },
