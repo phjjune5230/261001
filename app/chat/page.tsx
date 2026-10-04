@@ -9,6 +9,7 @@ import ModelPicker, { CUSTOM } from '@/components/ModelPicker'
 import ConversationList from '@/components/ConversationList'
 import Icon from '@/components/Icon'
 import { useConversations } from '@/hooks/useConversations'
+import { useModelRegistry } from '@/hooks/useModelRegistry'
 
 type Message = {
   role: 'user' | 'assistant'
@@ -41,6 +42,9 @@ export default function ChatPage() {
     saveTurn,
   } = useConversations('chat')
 
+  // 모델 목록은 서버(DB)에서 옵니다. v0.13.0 이전엔 코드에 박혀 있었습니다.
+  const registry = useModelRegistry()
+
   // 새 메시지가 생길 때마다 하단으로. 긴 대화에서 답이 화면 밖에 생기는 것을 막는다.
   const bottomRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -52,7 +56,9 @@ export default function ChatPage() {
 
   const handleProviderChange = (newProvider: Provider) => {
     setProvider(newProvider)
-    setModel(defaultModelFor(newProvider))
+    // 목록을 서버에서 읽으므로, provider를 바꾸면 그 목록의 첫 것으로 갑니다.
+    // (예전에는 코드에 박힌 기본값을 썼습니다)
+    setModel(registry.models[newProvider]?.[0]?.id ?? '')
   }
 
   /** 목록에서 대화를 고릅니다. 이전 대화의 provider·model도 되살립니다. */
@@ -197,6 +203,7 @@ export default function ChatPage() {
             onModelChange={setModel}
             customModel={customModel}
             onCustomModelChange={setCustomModel}
+            registry={registry}
           />
 
           <div>

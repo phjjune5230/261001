@@ -10,6 +10,7 @@ import SpeakButton from '@/components/SpeakButton'
 import Icon from '@/components/Icon'
 import ConversationList from '@/components/ConversationList'
 import { useConversations } from '@/hooks/useConversations'
+import { useModelRegistry } from '@/hooks/useModelRegistry'
 import { listEnglishRecords, saveEnglishRecords } from '@/lib/db'
 import {
   ERROR_CATEGORY_LABEL,
@@ -113,6 +114,9 @@ export default function EnglishPage() {
     saveTurn,
   } = useConversations('english')
 
+  // 모델 목록은 서버(DB)에서 옵니다. /chat과 같은 값을 봅니다.
+  const registry = useModelRegistry()
+
   /** 실제로 프롬프트에 들어갈 상황 문장. 프리셋이면 한국어 라벨 + 영어 지시. */
   const activeScenario = useMemo(() => {
     const custom = customScenario.trim()
@@ -174,7 +178,8 @@ export default function EnglishPage() {
 
   const handleProviderChange = (p: Provider) => {
     setProvider(p)
-    setModel(defaultModelFor(p))
+    // 목록을 서버에서 읽으므로 provider를 바꾸면 그 목록의 첫 것으로 갑니다.
+    setModel(registry.models[p]?.[0]?.id ?? '')
   }
 
   /**
@@ -503,6 +508,7 @@ export default function EnglishPage() {
               onModelChange={setModel}
               customModel={customModel}
               onCustomModelChange={setCustomModel}
+              registry={registry}
             />
           </div>
         </aside>

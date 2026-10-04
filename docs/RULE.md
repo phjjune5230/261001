@@ -18,6 +18,7 @@
 | `lib/auth.ts` | `APP_PIN` / `APP_TOKEN`을 읽습니다 |
 | `lib/db-server.ts` | `SUPABASE_SERVICE_ROLE_KEY`를 읽습니다 |
 | `lib/compaction.ts` | `lib/db-server.ts`를 거칩니다 |
+| `lib/model-registry.ts` | `lib/db-server.ts`를 거칩니다 |
 
 `server-only` 패키지를 붙이고 싶지만 아직 미설치입니다. 그래서 **규칙으로 막습니다.**
 모듈을 하나 추가하면 이 표에도 반드시 한 줄을 넣으세요 — 빠뜨린 규칙은 없는 규칙입니다.

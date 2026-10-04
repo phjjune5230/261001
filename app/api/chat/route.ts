@@ -9,7 +9,7 @@ import {
   unauthorized,
 } from '@/lib/api'
 import { countDropped, contextBudgetFor, estimateTokens } from '@/lib/context'
-import { limitsFor } from '@/lib/models'
+import { limitsForModel } from '@/lib/model-registry'
 import {
   attachSummary,
   planCompaction,
@@ -96,7 +96,10 @@ export async function POST(req: NextRequest) {
     // ★ 고른 모델의 한도로 예산을 정합니다 ★
     // 손으로 맞춘 상수가 여기 없으므로 provider를 바꿔도 값이 따라갑니다.
     // 한도를 모르는 모델이면 기본값으로 돌아갑니다 (lib/context.ts).
-    const limits = limitsFor(provider, typeof model === 'string' ? model : undefined)
+    //
+    // 목록은 DB에서 옵니다 (v0.13.0). 화면에서 고친 값이 여기까지 오지 않으면
+    // 앱에서 고친 것이 아무 효과가 없습니다. 못 읽으면 lib/models.ts로 돌아갑니다.
+    const limits = await limitsForModel(provider, typeof model === 'string' ? model : undefined)
     const budget = contextBudgetFor(limits.tpm, limits.maxTokens)
 
     let plan = planCompaction(

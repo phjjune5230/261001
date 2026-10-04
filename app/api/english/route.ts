@@ -13,7 +13,7 @@ import {
   countDropped,
   estimateTokens,
 } from '@/lib/context'
-import { limitsFor } from '@/lib/models'
+import { limitsForModel } from '@/lib/model-registry'
 import {
   FINISH_INSTRUCTION,
   LESSON_SYSTEM_PROMPT,
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     // 고른 모델의 한도에서 예산과 출력 상한을 정합니다 (lib/models.ts).
     // 이 라우트의 TOKENS_* 상수는 "이 기능이 얼마나 필요로 하는가"이고,
     // limits.maxTokens는 "모델이 최대 얼마를 받아 주는가"입니다. 작은 쪽을 씁니다.
-    const limits = limitsFor(provider, typeof model === 'string' ? model : undefined)
+    const limits = await limitsForModel(provider, typeof model === 'string' ? model : undefined)
     const budget = contextBudgetFor(limits.tpm, limits.maxTokens)
     const wantTokens = finish ? TOKENS_FINISH : TOKENS_PER_TURN
     const maxTokens = Math.min(wantTokens, limits.maxTokens)

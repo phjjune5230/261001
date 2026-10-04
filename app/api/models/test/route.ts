@@ -1,0 +1,86 @@
+/**
+ * ============================================================================
+ *  모델 시험 — "한 번 쏴보기"
+ * ============================================================================
+ *
+ *  모델을 앱에서 직접 등록하므로, **ID 오타를 먼저 알려주는 자리**가 필요합니다.
+ *  model ID는 provider가 자주 폐기합니다. 지워진 ID를 넣어두면 채팅을 보낼
+ *  때마다 404가 납니다 — 어느 모델 때문인지 찾는 데 시간이 걸립니다.
+ *
+ *  여기서 한 번 쏴보면 그 자리에서 kind가 'model'로 나옵니다.
+ *
+ *  ★ 이 라우트는 provider를 실제로 호출합니다 ★
+ *  호출만큼 비용이 듭니다. 그래서 최소로만 — 16토큰, 짧은 한마디.
+ *
+ *  규칙은 다른 라우트와 같습니다: 토큰 먼저 검사, 원본 오류는 브라우저로 안 보냅니다.
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { badRequest, hasValidToken, isKnownProvider, unauthorized } from '@/lib/api'
+import { describeError } from '@/lib/api'
+import { callLLM } from '@/lib/llm'
+import type { Provider } from '@/lib/llm'
+
+/** 시험인 셈이라도 정하는 값은 정합니다. 답이 긴 쓸데없는 비용은 내지 않습니다. */
+const PROBE_TOKENS = 16
+
+const PROBE_PROMPT = 'Hi'
+
+/** POST /api/models/test — { provider, model } */
+export async function POST(req: NextRequest) {
+  if (!hasValidToken(req)) return unauthorized()
+
+  let provider: Provider
+  let model: string
+  try {
+    const body = (await req.json()) as Record<string, unknown>
+    if (!isKnownProvider(body?.provider)) {
+      return badRequest('provider가 필요합니다.')
+    }
+    provider = body.provider
+    model = typeof body.model === 'string' ? body.model.trim() : ''
+    if (!model) return badRequest('model이 필요합니다.')
+  } catch {
+    return badRequest('본문을 읽을 수 없습니다.')
+  }
+
+  try {
+    const result = await callLLM(provider, [{ role: 'user', content: PROBE_PROMPT }], {
+      model,
+      maxTokens: PROBE_TOKENS,
+    })
+
+    // provider가 돌려준 model 이름이 우리가 보낸 것과 다르면 — 대표 모델로
+    // 되돌아간 것입니다. 이럴 때 조용히 넘어가면 "왜 내 설정이 안 먹지"가 됩니다.
+    const redirected = result.model && result.model !== model
+
+    return NextResponse.json({
+      ok: true,
+      kind: null,
+      message: '연결됐습니다.',
+      repliedModel: result.model ?? model,
+      redirected,
+      sample: result.content?.slice(0, 80) ?? '',
+    })
+  } catch (err: unknown) {
+    // ★ providerError()를 재 쓰지 않습니다 ★
+    // 그 함수는 500을 돌려주고 로그를 남기는데, 시험은 **실패가 정상 결과**입니다.
+    // 200으로 kind를 담아 돌려야 화면이 "실패 사유"를 정상적인 흐름으로 보여줍니다.
+    const { kind, message, provider: p, status } = describeError(err)
+
+    // 원본은 브라우저로 안 갑니다 (키 지문). 종류·provider·상태 코드만 남깁니다.
+    console.error(
+      `[models/test] 시험 실패: kind=${kind}` +
+      `${p ? ` provider=${p}` : ''}${status ? ` status=${status}` : ''}`
+    )
+
+    return NextResponse.json({
+      ok: false,
+      kind,
+      message,
+      repliedModel: null,
+      redirected: false,
+      sample: '',
+    })
+  }
+}
