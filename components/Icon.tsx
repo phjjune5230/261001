@@ -35,6 +35,8 @@ const PATHS = {
   plus: 'M12 5v14M5 12h14',
   // 쓰레기통
   trash: 'M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6',
+  // 펼침/접힘 표시 (기본은 아래로 향한다. 위로 접으면 rotate-180을 준다)
+  chevron: 'M6 9l6 6 6-6',
 } as const
 
 export type IconName = keyof typeof PATHS

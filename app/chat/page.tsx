@@ -14,6 +14,25 @@ import { useModelRegistry } from '@/hooks/useModelRegistry'
 type Message = {
   role: 'user' | 'assistant'
   content: string
+  /**
+   * ★ 이 메시지를 만들어낸 provider·model ★
+   *
+   * 라벨에 "AI"만 쓰면 어떤 모델이 답했는지 알 수 없습니다. 화면에 있는
+   * provider/model은 **지금 고른 것**이지 그 메시지를 만든 것이 아닙니다.
+   * 대화를 오가며 모델을 바꾸면 라벨이 거짓말을 하게 됩니다.
+   *
+   * 그래서 답을 받을 때 붙여서 저장합니다 (messages.meta). 열 때도 meta에서
+   * 되읽습니다 — 그래야 새로고침해도 라벨이 남습니다.
+   *
+   * ★ 없는 경우의 처리 ★
+   * 이 값을 쓰기 전에 저장된 메시지에는 meta에 모델이 없습니다. 그때는
+   * 대화 설정으로 대체합니다. 근사치이지 정답은 아닙니다 — 대화가 중간에
+   * 모델을 바꿨다면 그중 몇 턴은 잘못 표시됩니다. 대부분은 이 경우에
+   * 해당하지 않으므로, 없는 값을 지어내느라 라벨을 떨군 것보다 낫다고
+   * 판단했습니다. 이 판정이 틀린 적은 없습니다.
+   */
+  provider?: string
+  model?: string
 }
 
 export default function ChatPage() {
@@ -30,6 +49,15 @@ export default function ChatPage() {
   const [trimmedNotice, setTrimmedNotice] = useState<string>('')
   // 저장이 실패했을 때만 경고합니다. 성공은 조용합니다.
   const [saveWarning, setSaveWarning] = useState<string>('')
+  /**
+   * 왼쪽 설정 칸(대화 목록 · 모델 · 프롬프트)을 펼쳤나.
+   *
+   * ★ 기본은 접힘 ★
+   * 이 앱의 주된 행동은 메시지를 보내는 것이고, 대화 목록·모델 선택·시스템
+   * 프롬프트 세 덩어리는 그 옆에서 계속 자리를 차지했습니다. 모바일에서는
+   * 대화창을 반 이하로 밀어냈습니다. 그래서 접힌 상태로 시작합니다.
+   */
+  const [panelOpen, setPanelOpen] = useState<boolean>(false)
 
   const {
     enabled: savingEnabled,
@@ -64,11 +92,37 @@ export default function ChatPage() {
   /** 목록에서 대화를 고릅니다. 이전 대화의 provider·model도 되살립니다. */
   const handleSelectConversation = async (id: string) => {
     const rows = await openConversation(id)
-    setMessages(rows.map((r) => ({ role: r.role, content: r.content })))
+
+    const convo = conversations.find((c) => c.id === id)
+    const fallbackProvider = convo?.provider ?? provider
+    const fallbackModel = convo?.model ?? ''
+
+    // AI 라벨에 쓸 provider·model을 되읽습니다. meta에 없는 옛 메시지는
+    // 대화 설정으로 대체합니다 (Message 타입의 주석 참고).
+    setMessages(
+      rows.map((r) => {
+        const meta = r.meta as { provider?: unknown; model?: unknown } | null
+        return {
+          role: r.role,
+          content: r.content,
+          provider:
+            typeof meta?.provider === 'string'
+              ? meta.provider
+              : r.role === 'assistant'
+                ? fallbackProvider
+                : undefined,
+          model:
+            typeof meta?.model === 'string'
+              ? meta.model
+              : r.role === 'assistant'
+                ? fallbackModel || activeModel
+                : undefined,
+        }
+      })
+    )
     setTrimmedNotice('')
     setError('')
 
-    const convo = conversations.find((c) => c.id === id)
     if (convo?.provider && convo?.model) {
       const p = convo.provider as Provider
       setProvider(p)
@@ -131,10 +185,23 @@ export default function ChatPage() {
         throw new Error(data.error || '요청에 실패했습니다.')
       }
 
-      setMessages([...nextMessages, { role: 'assistant', content: data.content }])
+      // ★ 라벨에 쓸 모델은 "우리가 보낸 것"이 아니라 "provider가 되돌린 것" ★
+      // provider가 대표 모델로 되돌려줄 수 있고, 그때 실제 답을 쓴 것은
+      // 돌려받은 쪽입니다. data가 없는 예외 상황에만 보낸 값으로 대체합니다.
+      const repliedProvider: string = data.provider || provider
+      const repliedModel: string = data.model || activeModel
+
+      setMessages([
+        ...nextMessages,
+        { role: 'assistant', content: data.content, provider: repliedProvider, model: repliedModel },
+      ])
 
       // 화면에 먼저 찍고 저장은 그다음. 저장이 느려도 대화가 멈추지 않습니다.
-      const saved = await saveTurn(userMessage.content, data.content)
+      // meta에 모델을 함께 넣어 라벨이 새로고침 뒤에도 남게 합니다.
+      const saved = await saveTurn(userMessage.content, data.content, {
+        provider: repliedProvider,
+        model: repliedModel,
+      })
       setSaveWarning(saved ? '' : '이 대화는 저장되지 않았습니다. Supabase 연결을 확인하세요.')
 
       // 버린 게 있을 때만 알려준다. 매번 말을 걸면 노이즈가 된다.
@@ -161,62 +228,118 @@ export default function ChatPage() {
 
   return (
     <main className="min-h-screen bg-page text-ink flex flex-col">
-      {/* Header */}
-      <header className="border-b border-line px-6 py-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      {/*
+        Header
+
+        ★ 모바일에서 한 줄을 지킨다 ★
+        예전에는 `← 홈 · AI 채팅 · 활성 모델: groq / openai/gpt-oss-120b`가
+        한 줄에 얹혔습니다. 좁은 화면에서는 모델 ID가 길어서 줄이 두 줄로
+        깨지고 헤더가 화면을 두 배로 먹었습니다.
+
+        고친 것
+          - 패딩·간격을 모바일에서 줄였습니다 (px-6 py-4 → px-4 py-3).
+          - 제목은 text-sub(13px)로 내렸고 sm 이상에서만 text-title(17px)입니다.
+          - "활성 모델:" 라벨은 sm 미만에서 숨깁니다.
+          - provider 접두어도 뺍니다. 모델명만 남깁니다.
+          - 남은 모델명은 truncate로 앞부분만 보여주고, title 속성에 전체를 둡니다
+            (데스크톱 커서를 올리면 전체가 나옵니다).
+        그래도 긴 모델 ID는 아무리 줄여도 한 화면에 들어가지 않습니다 —
+        그래서 truncate로 끊습니다. 접는 것이 지터를 없앨 뿐이진 않습니다.
+      */}
+      <header className="border-b border-line px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0 min-w-0">
           <Link
             href="/"
-            className="text-meta text-ink-muted hover:text-ink transition-colors"
+            className="text-meta text-ink-muted hover:text-ink transition-colors shrink-0"
           >
             ← 홈
           </Link>
-          <h1 className="font-display text-title">AI 채팅</h1>
+          <h1 className="font-display text-sub sm:text-title whitespace-nowrap">AI 채팅</h1>
         </div>
-        <div className="flex items-center gap-2 text-meta text-ink-muted">
-          <span>활성 모델:</span>
+        <div className="flex items-center gap-2 min-w-0 text-meta text-ink-muted">
+          <span className="hidden sm:inline shrink-0">활성 모델:</span>
           {/* 강조색은 전송 버튼과 AI 라벨 점 두 곳에만 쓴다 */}
-          <span className="font-mono text-ink">
-            {provider} / {activeModel || '모델 미설정'}
+          <span
+            className="font-mono text-ink truncate"
+            title={`${provider} / ${activeModel || '모델 미설정'}`}
+          >
+            {activeModel || '모델 미설정'}
           </span>
         </div>
       </header>
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto">
-        {/* Sidebar Controls */}
-        <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-line p-6 flex flex-col gap-6">
-          <ConversationList
-            conversations={conversations}
-            activeId={activeId}
-            enabled={savingEnabled}
-            loading={loadingList}
-            onSelect={(id) => void handleSelectConversation(id)}
-            onNew={() => void handleNewConversation()}
-            onDelete={(id) => void removeConversation(id)}
-            emptyHint="저장된 대화가 없습니다. 첫 메시지를 보내면 만들어집니다."
-          />
+        {/*
+          Sidebar
 
-          <ModelPicker
-            provider={provider}
-            onProviderChange={handleProviderChange}
-            model={model}
-            onModelChange={setModel}
-            customModel={customModel}
-            onCustomModelChange={setCustomModel}
-            registry={registry}
-          />
+          ★ 기본은 접힌 상태입니다 ★
+          대화 목록 + 모델 선택 + 시스템 프롬프트가 세 덩어리인데, 이 앱의
+          주된 행동은 "메시지를 보내는 것"입니다. 그 세 덩어리는 chatscroll을
+          계속 밀어내면서 아무것도 하지 않는 반열이었고, 모바일에서는 대화창
+          절반을 차지했습니다.
 
-          <div>
-            <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
-              시스템 프롬프트
-            </label>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              rows={4}
-              className="w-full bg-surface-2 border border-line rounded-md p-3 text-sub text-ink font-mono shadow-edge outline-none focus:border-line-strong transition-colors resize-none"
+          기본을 펼침으로 두면 화면 첫 진입에 가장 많이 쓰는 대화창이 제일
+          좁아집니다. 그래서 접힘이 기본이고, 펼칠 때만 그 칸이 됩니다.
+
+          접었다 폈다는 화면 상태일 뿐 대화 상태가 아닙니다. 서버에도 저장하지
+          않습니다 — 저장하면 다음에 열 때 예측 못 하는 화면이 됩니다.
+        */}
+        <aside className="w-full md:w-80 shrink-0 border-b md:border-b-0 md:border-r border-line">
+          <button
+            type="button"
+            onClick={() => setPanelOpen((v) => !v)}
+            aria-expanded={panelOpen}
+            className="w-full flex items-center justify-between px-4 sm:px-6 md:px-4 py-3 text-meta text-ink-muted hover:text-ink transition-colors"
+          >
+            <span>
+              설정
+              <span className="text-ink-faint"> · 대화 · 모델 · 프롬프트</span>
+            </span>
+            <Icon
+              name="chevron"
+              size={14}
+              strokeWidth={2}
+              className={`shrink-0 transition-transform ${panelOpen ? 'rotate-180' : ''}`}
             />
-          </div>
+          </button>
+
+          {panelOpen && (
+            <div className="p-4 sm:p-6 pt-0 md:pt-0 flex flex-col gap-6">
+              <ConversationList
+                conversations={conversations}
+                activeId={activeId}
+                enabled={savingEnabled}
+                loading={loadingList}
+                onSelect={(id) => void handleSelectConversation(id)}
+                onNew={() => void handleNewConversation()}
+                onDelete={(id) => void removeConversation(id)}
+                emptyHint="저장된 대화가 없습니다. 첫 메시지를 보내면 만들어집니다."
+              />
+
+              <ModelPicker
+                provider={provider}
+                onProviderChange={handleProviderChange}
+                model={model}
+                onModelChange={setModel}
+                customModel={customModel}
+                onCustomModelChange={setCustomModel}
+                registry={registry}
+              />
+
+              <div>
+                <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
+                  시스템 프롬프트
+                </label>
+                <textarea
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  rows={4}
+                  className="w-full bg-surface-2 border border-line rounded-md p-3 text-sub text-ink font-mono shadow-edge outline-none focus:border-line-strong transition-colors resize-none"
+                />
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* Chat Area */}
@@ -250,12 +373,28 @@ export default function ChatPage() {
                     m.role === 'user' ? 'self-end items-end' : 'self-start items-start'
                   }`}
                 >
-                  <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint">
+                  <span
+                    className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint min-w-0 max-w-full"
+                    title={m.role === 'assistant' ? `AI: ${m.provider} / ${m.model}` : undefined}
+                  >
                     {/* AI 라벨 앞의 점 — 강조색 두 번째(마지막) 지점 */}
                     {m.role === 'assistant' && (
-                      <i className="w-1 h-1 rounded-full bg-accent" aria-hidden="true" />
+                      <i className="w-1 h-1 rounded-full bg-accent shrink-0" aria-hidden="true" />
                     )}
-                    {m.role === 'user' ? 'You' : 'AI'}
+                    {/*
+                      ★ "AI"만 쓰면 어떤 모델이 답했는지 알 수 없습니다 ★
+                      provider와 모델명을 함께 적습니다. 대화가 길어질수록 모델을
+                      바꿔 쓰게 되는데, 라벨에 없으면 왜 답투가 달라졌는지 확인할
+                      단서가 없습니다.
+
+                      truncate를 줬습니다. 모델 ID는 길고 말풍선은 80% 폭이라,
+                      라벨이 한 줄을 넘어가면 메시지 전체의 폭까지 줄어들 있었습니다.
+                    */}
+                    <span className={m.role === 'assistant' ? 'truncate' : undefined}>
+                      {m.role === 'user'
+                        ? 'You'
+                        : `AI: ${m.provider ?? ''} / ${m.model ?? ''}`.trim()}
+                    </span>
                   </span>
                   <div
                     className={`rounded-lg px-4 py-3 text-body whitespace-pre-wrap border shadow-edge ${
@@ -271,9 +410,9 @@ export default function ChatPage() {
             )}
             {loading && (
               <div className="flex flex-col gap-1.5 self-start items-start">
-                <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint">
-                  <i className="w-1 h-1 rounded-full bg-accent" aria-hidden="true" />
-                  AI 응답 중
+                <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint min-w-0 max-w-full">
+                  <i className="w-1 h-1 rounded-full bg-accent shrink-0" aria-hidden="true" />
+                  <span className="truncate">AI 응답 중 · {provider} / {activeModel || '모델 미설정'}</span>
                 </span>
                 <div className="rounded-lg px-4 py-3 text-body bg-bubble-them border border-line shadow-edge text-ink-faint">
                   생성 중...
