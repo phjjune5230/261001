@@ -7,9 +7,17 @@ import { DEFAULT_PROVIDER, defaultModelFor } from '@/lib/models'
 import { clearToken, getToken } from '@/lib/auth-client'
 import ModelPicker, { CUSTOM } from '@/components/ModelPicker'
 import ConversationList from '@/components/ConversationList'
+import SidePanel, { type SidePanelTab } from '@/components/SidePanel'
 import Icon from '@/components/Icon'
 import { useConversations } from '@/hooks/useConversations'
 import { useModelRegistry } from '@/hooks/useModelRegistry'
+
+/** 왼쪽 칸의 탭 순서. 영어 화면은 상황이 먼저이므로 그쪽은 다릅니다. */
+const CHAT_TABS: SidePanelTab[] = [
+  { id: 'chat', label: '대화' },
+  { id: 'model', label: '모델' },
+  { id: 'prompt', label: '프롬프트' },
+]
 
 type Message = {
   role: 'user' | 'assistant'
@@ -49,15 +57,6 @@ export default function ChatPage() {
   const [trimmedNotice, setTrimmedNotice] = useState<string>('')
   // 저장이 실패했을 때만 경고합니다. 성공은 조용합니다.
   const [saveWarning, setSaveWarning] = useState<string>('')
-  /**
-   * 왼쪽 설정 칸(대화 목록 · 모델 · 프롬프트)을 펼쳤나.
-   *
-   * ★ 기본은 접힘 ★
-   * 이 앱의 주된 행동은 메시지를 보내는 것이고, 대화 목록·모델 선택·시스템
-   * 프롬프트 세 덩어리는 그 옆에서 계속 자리를 차지했습니다. 모바일에서는
-   * 대화창을 반 이하로 밀어냈습니다. 그래서 접힌 상태로 시작합니다.
-   */
-  const [panelOpen, setPanelOpen] = useState<boolean>(false)
   /**
    * "새 대화"를 누를 때마다 올라갑니다.
    *
@@ -280,41 +279,47 @@ export default function ChatPage() {
       {/* Main Container */}
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto">
         {/*
-          Sidebar
+          Sidebar — tabs: 대화 · 모델 · 프롬프트
 
-          ★ 기본은 접힌 상태입니다 ★
-          대화 목록 + 모델 선택 + 시스템 프롬프트가 세 덩어리인데, 이 앱의
-          주된 행동은 "메시지를 보내는 것"입니다. 그 세 덩어리는 chatscroll을
-          계속 밀어내면서 아무것도 하지 않는 반열이었고, 모바일에서는 대화창
-          절반을 차지했습니다.
+          ★ "설정" 제목을 뗐고, 탭 표시줄이 곧 접기 버튼입니다 ★
+          대화를 누르면 과거 대화만, 모델을 누르면 모델 선택만,
+          프롬프트를 누르면 입력 상자만 뜹니다. 기본은 접힘.
 
-          기본을 펼침으로 두면 화면 첫 진입에 가장 많이 쓰는 대화창이 제일
-          좁아집니다. 그래서 접힘이 기본이고, 펼칠 때만 그 칸이 됩니다.
-
-          접었다 폈다는 화면 상태일 뿐 대화 상태가 아닙니다. 서버에도 저장하지
-          않습니다 — 저장하면 다음에 열 때 예측 못 하는 화면이 됩니다.
+          순서는 이 화면의 흐름을 따랐습니다 — 대화가 가장 많이 쓰이고
+          (과거 찾기), 그다음 모델 바꾸기, 프롬프트는 거의 한 번뿐입니다.
+          영어 화면은 상황이 먼저 오는 흐름이라 그쪽 순서가 다릅니다.
         */}
-        <aside className="w-full md:w-80 shrink-0 border-b md:border-b-0 md:border-r border-line">
-          <button
-            type="button"
-            onClick={() => setPanelOpen((v) => !v)}
-            aria-expanded={panelOpen}
-            className="w-full flex items-center justify-between px-4 sm:px-6 md:px-4 py-3 text-meta text-ink-muted hover:text-ink transition-colors"
-          >
-            <span>
-              설정
-              <span className="text-ink-faint"> · 대화 · 모델 · 프롬프트</span>
-            </span>
-            <Icon
-              name="chevron"
-              size={14}
-              strokeWidth={2}
-              className={`shrink-0 transition-transform ${panelOpen ? 'rotate-180' : ''}`}
-            />
-          </button>
-
-          {panelOpen && (
-            <div className="p-4 sm:p-6 pt-0 md:pt-0 flex flex-col gap-6">
+        <SidePanel tabs={CHAT_TABS}>
+          {(tab) => {
+            if (tab === 'model') {
+              return (
+                <ModelPicker
+                  provider={provider}
+                  onProviderChange={handleProviderChange}
+                  model={model}
+                  onModelChange={setModel}
+                  customModel={customModel}
+                  onCustomModelChange={setCustomModel}
+                  registry={registry}
+                />
+              )
+            }
+            if (tab === 'prompt') {
+              return (
+                <div>
+                  <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
+                    시스템 프롬프트
+                  </label>
+                  <textarea
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    rows={6}
+                    className="w-full bg-surface-2 border border-line rounded-md p-3 text-sub text-ink font-mono shadow-edge outline-none focus:border-line-strong transition-colors resize-none"
+                  />
+                </div>
+              )
+            }
+            return (
               <ConversationList
                 conversations={conversations}
                 activeId={activeId}
@@ -326,31 +331,9 @@ export default function ChatPage() {
                 emptyHint="저장된 대화가 없습니다. 첫 메시지를 보내면 만들어집니다."
                 resetSignal={listReset}
               />
-
-              <ModelPicker
-                provider={provider}
-                onProviderChange={handleProviderChange}
-                model={model}
-                onModelChange={setModel}
-                customModel={customModel}
-                onCustomModelChange={setCustomModel}
-                registry={registry}
-              />
-
-              <div>
-                <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
-                  시스템 프롬프트
-                </label>
-                <textarea
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  rows={4}
-                  className="w-full bg-surface-2 border border-line rounded-md p-3 text-sub text-ink font-mono shadow-edge outline-none focus:border-line-strong transition-colors resize-none"
-                />
-              </div>
-            </div>
-          )}
-        </aside>
+            )
+          }}
+        </SidePanel>
 
         {/* Chat Area */}
         <section className="flex-1 flex flex-col h-[calc(100vh-65px)] md:h-auto">

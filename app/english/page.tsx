@@ -9,6 +9,7 @@ import ModelPicker, { CUSTOM } from '@/components/ModelPicker'
 import SpeakButton from '@/components/SpeakButton'
 import Icon from '@/components/Icon'
 import ConversationList from '@/components/ConversationList'
+import SidePanel, { type SidePanelTab } from '@/components/SidePanel'
 import { useConversations } from '@/hooks/useConversations'
 import { useModelRegistry } from '@/hooks/useModelRegistry'
 import { listEnglishRecords, saveEnglishRecords } from '@/lib/db'
@@ -24,6 +25,20 @@ import {
   type LessonSummary,
   type LessonTurn,
 } from '@/lib/lesson'
+
+/**
+ * 왼쪽 칸의 탭 순서.
+ *
+ * ★ 채팅과 순서가 다릅니다 ★
+ * 영어는 상황을 먼저 고르고 대화하므로 상황이 첫 탭입니다. 채팅은 대화가
+ * 첫 탭입니다. 화면마다 흐름이 다르니 순서도 다르게 두었습니다 —
+ * 어느 한쪽을 맞추려고 하면 다른 쪽의 흐름을 거스릅니다.
+ */
+const ENGLISH_TABS: SidePanelTab[] = [
+  { id: 'scenario', label: '상황' },
+  { id: 'chat', label: '대화' },
+  { id: 'model', label: '모델' },
+]
 
 type Entry =
   | { kind: 'user'; text: string }
@@ -118,8 +133,6 @@ export default function EnglishPage() {
   const [finished, setFinished] = useState<boolean>(false)
   // 채팅과 같다 — 저장이 실패했을 때만 경고합니다.
   const [saveWarning, setSaveWarning] = useState<string>('')
-  // 채팅과 같다 — 기본은 접힘. 이 앱의 주된 행동은 발화입니다.
-  const [panelOpen, setPanelOpen] = useState<boolean>(false)
   // 채팅과 같다 — 새 세션을 만들면 목록 1페이지로 되돌립니다.
   const [listReset, setListReset] = useState<number>(0)
 
@@ -494,41 +507,51 @@ export default function EnglishPage() {
 
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto">
         {/*
-          Sidebar — 채팅 화면과 같은 구조. 기본은 접힘.
+          Sidebar — tabs: 상황 · 대화 · 모델
 
-          상황 선택 · 대화 목록 · 모델 선택 세 덩어리가 채팅창 위를 계속
-          밀어냈습니다. 이 화면의 주된 행동은 영어로 말해 보는 것이고,
-          세 덩어리는 그 옆에서 자리를 차지할 뿐이었습니다.
+          ★ "설정" 제목을 뗐고, 탭 표시줄이 곧 접기 버튼입니다 ★
+          채팅 화면과 같은 컴포넌트(SidePanel)를 씁니다.
+          영어는 상황을 먼저 고르고 말하므로 상황 탭이 첫 자리입니다.
         */}
-        <aside className="w-full md:w-80 shrink-0 border-b md:border-b-0 md:border-r border-line">
-          <button
-            type="button"
-            onClick={() => setPanelOpen((v) => !v)}
-            aria-expanded={panelOpen}
-            className="w-full flex items-center justify-between px-4 sm:px-6 md:px-4 py-3 text-meta text-ink-muted hover:text-ink transition-colors"
-          >
-            <span>
-              설정
-              <span className="text-ink-faint"> · 상황 · 대화 · 모델</span>
-            </span>
-            <Icon
-              name="chevron"
-              size={14}
-              strokeWidth={2}
-              className={`shrink-0 transition-transform ${panelOpen ? 'rotate-180' : ''}`}
-            />
-          </button>
-
-          {panelOpen && (
-            <div className="p-4 sm:p-6 pt-0 md:pt-0 flex flex-col gap-6">
-              {/*
-                수준·목표 선택 UI를 걷어냈습니다.
-                이미 아는 걸 다시 묻지 않습니다 (docs/10-english-guide.md §2).
-                값은 서버 상수로 들어 있습니다 (lib/lesson.ts의 LEARNER_BASELINE).
-                대신 "무엇을 연습할지"만 고릅니다 — 선택지가 되돌 제약이 되지
-                않도록 직접 입력을 항상 함께 둡니다.
-              */}
-              <div>
+        <SidePanel tabs={ENGLISH_TABS}>
+          {(tab) => {
+            if (tab === 'chat') {
+              return (
+                <ConversationList
+                  conversations={conversations}
+                  activeId={activeId}
+                  enabled={savingEnabled}
+                  loading={loadingList}
+                  onSelect={(id) => void handleSelectConversation(id)}
+                  onNew={() => void startOver()}
+                  onDelete={(id) => void removeConversation(id)}
+                  emptyHint="저장된 세션이 없습니다. 첫 발화를 보내면 만들어집니다."
+                  resetSignal={listReset}
+                />
+              )
+            }
+            if (tab === 'model') {
+              return (
+                <ModelPicker
+                  provider={provider}
+                  onProviderChange={handleProviderChange}
+                  model={model}
+                  onModelChange={setModel}
+                  customModel={customModel}
+                  onCustomModelChange={setCustomModel}
+                  registry={registry}
+                />
+              )
+            }
+            return (
+              <>
+                {/*
+                  수준·목표 선택 UI를 걷어냈습니다.
+                  이미 아는 걸 다시 묻지 않습니다 (docs/10-english-guide.md §2).
+                  값은 서버 상수로 들어 있습니다 (lib/lesson.ts의 LEARNER_BASELINE).
+                  대신 "무엇을 연습할지"만 고릅니다 — 선택지가 되돌 제약이 되지
+                  않도록 직접 입력을 항상 함께 둡니다.
+                */}
                 <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
                   오늘 연습할 상황
                 </label>
@@ -561,32 +584,10 @@ export default function EnglishPage() {
                 <p className="mt-2 text-meta leading-relaxed text-ink-faint">
                   고르지 않아도 됩니다. 상황 없이 그냥 대화해도 됩니다.
                 </p>
-              </div>
-
-              <ConversationList
-                conversations={conversations}
-                activeId={activeId}
-                enabled={savingEnabled}
-                loading={loadingList}
-                onSelect={(id) => void handleSelectConversation(id)}
-                onNew={() => void startOver()}
-                onDelete={(id) => void removeConversation(id)}
-                emptyHint="저장된 세션이 없습니다. 첫 발화를 보내면 만들어집니다."
-                resetSignal={listReset}
-              />
-
-              <ModelPicker
-                provider={provider}
-                onProviderChange={handleProviderChange}
-                model={model}
-                onModelChange={setModel}
-                customModel={customModel}
-                onCustomModelChange={setCustomModel}
-                registry={registry}
-              />
-            </div>
-          )}
-        </aside>
+              </>
+            )
+          }}
+        </SidePanel>
 
         <section className="flex-1 flex flex-col h-[calc(100vh-65px)] md:h-auto">
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
