@@ -98,7 +98,8 @@ export default function ModelPicker({
       if (r.ok) {
         setProbeResult(
           `${m.id} — 연결됨` +
-          (r.redirected ? ` (provider가 ${r.repliedModel}로 돌려줌)` : '')
+          (r.redirected ? ` (provider가 ${r.repliedModel}로 돌려줌)` : '') +
+          ` · 출력 상한 ${r.usedTokens}토큰`
         )
       } else {
         setProbeResult(`${m.id} — 실패 [${r.kind}] ${r.message}`)

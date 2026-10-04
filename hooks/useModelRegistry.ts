@@ -173,6 +173,7 @@ export function useModelRegistry() {
       message: string
       repliedModel: string | null
       redirected: boolean
+      usedTokens: number
       sample: string
     }
   }, [])

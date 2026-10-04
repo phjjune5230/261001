@@ -124,22 +124,46 @@ export async function callLLM(
       // 예전에는 본문만 던졌는데, 본문에 "503"이 없으면 일시적 오류로 못 알아봅니다.
       // 상태를 넣으면 5xx 판정이 믿을 만해집니다 (아래 TRANSIENT 참고).
       const raw = await res.text()
-      let data: { choices?: { message?: { content?: string } }[] } | null = null
+      let data: {
+        choices?: { message?: { content?: string }; finish_reason?: string }[]
+      } | null = null
       try {
         data = JSON.parse(raw)
       } catch {
         data = null
       }
 
-      const content = data?.choices?.[0]?.message?.content
-      if (!res.ok || !content) {
+      // ★ HTTP 실패와 빈 응답을 **반드시 나눕니다 ★
+      // 예전에는 `if (!res.ok || !content)`로 함께 처리했는데, 그러면 provider가
+      // 200을 줬는데 본문이 비었을 때 "에러"로 기록됩니다.
+      // 실제로 이러면 status=200이 걸려 분류표에 걸리지 않고 unknown이 되어,
+      // 사용자는 "잠시 후 다시 시도"만 눌러봤습니다 (2026-10-04, gpt-oss-120b 시험).
+      if (!res.ok) {
         // 본문은 잘라서 넣습니다 — 서버 콘솔용이고, provider가 긴 진단을 붙여 보냅니다.
         throw new Error(
           `${provider} ${res.status} error: ${raw.slice(0, 500)}`
         )
       }
 
-      return { content: String(content), provider, model }
+      const choice = data?.choices?.[0]
+      const content = choice?.message?.content
+
+      // 200인데 본문이 없습니다. 실패가 아니라 "빈 응답"입니다.
+      //
+      // ★ 왜 이게 일어나나 ★
+      // 추론(reasoning) 모델은 본문을 쓰기 **전에** 별도 reasoning 토큰을 씁니다.
+      // max_tokens이 작으면 거기가 다 먹고 본문은 빈 문자열로 돌아옵니다.
+      // 그래서 16토큰 시험에서 gpt-oss-120b가 실패하고 qwen3.8-27b는 통과했습니다.
+      // 같은 일이 채팅에서도 일어납니다 — maxTokens가 모자라면 말이 안 나오고,
+      // 사용자는 그 사실을 알 수 없었습니다.
+      if (typeof content !== 'string' || content.trim() === '') {
+        const reason =
+          typeof choice?.finish_reason === 'string' ? choice.finish_reason : 'unknown'
+        // provider 본문은 넣지 않습니다. finish_reason만 남깁니다.
+        throw new Error(`${provider} 200 empty: finish_reason=${reason}`)
+      }
+
+      return { content, provider, model }
     })
   }
 

@@ -18,11 +18,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { badRequest, hasValidToken, isKnownProvider, unauthorized } from '@/lib/api'
 import { describeError } from '@/lib/api'
+import { limitsForModel } from '@/lib/model-registry'
 import { callLLM } from '@/lib/llm'
 import type { Provider } from '@/lib/llm'
 
-/** 시험인 셈이라도 정하는 값은 정합니다. 답이 긴 쓸데없는 비용은 내지 않습니다. */
-const PROBE_TOKENS = 16
+/**
+ * 시험에 쓸 출력 상한의 **상한선**입니다.
+ *
+ * ★ 실제 값은 그 모델에 등록된 maxTokens를 씁니다 ★
+ * 시험이 답해야 하는 질문은 "이 모델이 채팅에서 되나"입니다.
+ * 그런데 시험이 다른 값을 쓰면 답이 달라집니다 — 실제로 16토큰에서는
+ * 추론 모델(gpt-oss-120b)이 실패하고 비추론 모델(qwen3.8-27b)은 통과했습니다.
+ * 시험이 실제보다 불리한 조건이면 결과가 거짓말을 합니다.
+ *
+ * 그래서 등록값을 쓰되, 무모하게 큰 값으로 비용이 새지 않게 여기서 자릅니다.
+ */
+const PROBE_TOKEN_CEILING = 512
 
 const PROBE_PROMPT = 'Hi'
 
@@ -45,9 +56,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // 채팅에서 이 모델이 실제로 받는 값을 그대로 씁니다.
+    const limits = await limitsForModel(provider, model)
+    const maxTokens = Math.min(limits.maxTokens, PROBE_TOKEN_CEILING)
+
     const result = await callLLM(provider, [{ role: 'user', content: PROBE_PROMPT }], {
       model,
-      maxTokens: PROBE_TOKENS,
+      maxTokens,
     })
 
     // provider가 돌려준 model 이름이 우리가 보낸 것과 다르면 — 대표 모델로
@@ -60,6 +75,7 @@ export async function POST(req: NextRequest) {
       message: '연결됐습니다.',
       repliedModel: result.model ?? model,
       redirected,
+      usedTokens: maxTokens,
       sample: result.content?.slice(0, 80) ?? '',
     })
   } catch (err: unknown) {
@@ -80,6 +96,7 @@ export async function POST(req: NextRequest) {
       message,
       repliedModel: null,
       redirected: false,
+      usedTokens: 0,
       sample: '',
     })
   }

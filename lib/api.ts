@@ -55,6 +55,7 @@ export type ErrorKind =
   | 'rate'      // 분당 요청 또는 토큰 한도 초과
   | 'credit'    // 잔액·결제 문제
   | 'context'   // 입력이 컨텍스트 한도를 넘음
+  | 'empty'     // provider는 200을 줬는데 본문이 비어 있음 (출력 상한 부족)
   | 'policy'    // 안전 필터에 막힘
   | 'timeout'   // 네트워크 지연·단절
   | 'transient' // provider 일시 장애 (5xx)
@@ -85,7 +86,7 @@ const CLASSIFY: { kind: ErrorKind; re: RegExp; message: string }[] = [
     kind: 'model',
     re: /\b404\b|model.{0,3}not.{0,3}found|is not found|does not exist|deprecat|폐기/i,
     message: 'provider가 그 모델을 모릅니다. 모델 ID가 폐기되었거나 오타입니다. ' +
-      'lib/models.ts의 목록을 확인해주세요.',
+      '모델 관리 화면에서 ID를 확인하거나 목록에서 지워주세요.',
   },
   {
     kind: 'quota',
@@ -101,6 +102,23 @@ const CLASSIFY: { kind: ErrorKind; re: RegExp; message: string }[] = [
     kind: 'context',
     re: /context.{0,3}length|maximum context|too many tokens|reduce the length|token count|too long/i,
     message: '입력이 모델의 컨텍스트 한도를 넘었습니다. 앞 대화를 줄여주세요.',
+  },
+  {
+    /**
+     * ★ provider는 200을 줬는데 본문이 비어 있음 ★
+     *
+     * 이건 실패가 아닙니다. 추론(reasoning) 모델은 본문을 쓰기 전에
+     * 별도 reasoning 토큰을 쓰기 때문입니다. max_tokens이 작으면 거기가 다 먹고
+     * content가 빈 문자열로 돌아옵니다.
+     *
+     * "다시 시도"로 해결되지 않습니다. 값을 올려야 합니다 —
+     * 그래서 그 말을 정확히 합니다 (2026-10-04, gpt-oss-120b 시험에서 발견).
+     */
+    kind: 'empty',
+    re: /\b200 empty\b|finish_reason/i,
+    message:
+      '모델이 빈 응답을 돌려줬습니다. 답을 쓰기 전에 출력 상한을 다 쓴 것일 수 있습니다 — ' +
+      '이 모델의 maxTokens를 올려보세요. 같은 값을 다시 눌러도 달라지지 않습니다.',
   },
   {
     kind: 'policy',
