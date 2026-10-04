@@ -166,6 +166,31 @@ export type ErrorSummary = {
   provider: string | null
   /** HTTP 상태 코드. 알 수 없으면 null */
   status: number | null
+  /**
+   * provider가 본문을 못 채운 이유 (kind가 'empty'일 때만 있음). 알 수 없으면 null.
+   *
+   * ★ 이 값이 "빈 응답"의 원인을 그대로 갈라냅니다 ★
+   * lib/llm.ts가 reasoning 모델의 빈 응답을 만났을 때
+   * `200 empty: finish_reason=length`처럼 던집니다. 여기서 그것을 꺼내지 않으면
+   * 사용자에게는 "빈 응답"이라는 말만 남고, 무엇을 해야 하는지(출력 상한을 올려야
+   * 하는지 / 다른 문제인지) 알 수 없습니다.
+   *
+   *   length — 출력 상한을 다 썼다. maxTokens를 올리면 됩니다. (2026-10-04, gpt-oss-120b)
+   *   그 외   — 상한 문제가 아니다. 값을 올려도 그대로입니다.
+   *
+   * credential이 아니므로 로그와 응답에 실어도 안전합니다 (provider 본문과 다릅니다).
+   */
+  finishReason: string | null
+}
+
+/**
+ * lib/llm.ts가 빈 응답에 붙여 남긴 finish_reason을 꺼냅니다.
+ *
+ * 정규식으로만 찾습니다 — 만들어낼 값이 없습니다.
+ */
+function safeFinishReason(msg: string): string | null {
+  const m = /finish_reason=([a-z_]+)/i.exec(msg)
+  return m ? m[1] : null
 }
 
 /**
@@ -177,13 +202,14 @@ export type ErrorSummary = {
 export function describeError(err: unknown): ErrorSummary {
   const msg = err instanceof Error ? err.message : ''
   const { provider, status } = safeSource(msg)
+  const finishReason = safeFinishReason(msg)
 
   if (OWN_ERRORS.some(re => re.test(msg))) {
-    return { kind: 'config', message: msg, provider, status }
+    return { kind: 'config', message: msg, provider, status, finishReason }
   }
 
   for (const { kind, re, message } of CLASSIFY) {
-    if (re.test(msg)) return { kind, message, provider, status }
+    if (re.test(msg)) return { kind, message, provider, status, finishReason }
   }
 
   return {
@@ -191,6 +217,7 @@ export function describeError(err: unknown): ErrorSummary {
     message: '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.',
     provider,
     status,
+    finishReason,
   }
 }
 
@@ -217,13 +244,14 @@ export function userFacingMessage(err: unknown): string {
  * 볼 수 있어야 서버 콘솔에 붙이지 않고도 원인을 알 수 있습니다.
  */
 export function providerError(err: unknown, label: string): NextResponse {
-  const { kind, message, provider, status } = describeError(err)
+  const { kind, message, provider, status, finishReason } = describeError(err)
   console.error(
     `[${label}] provider 호출 실패: kind=${kind}` +
     `${provider ? ` provider=${provider}` : ''}` +
-    `${status ? ` status=${status}` : ''}`
+    `${status ? ` status=${status}` : ''}` +
+      `${finishReason ? ` finish_reason=${finishReason}` : ''}`
   )
-  return NextResponse.json({ error: message, kind }, { status: 500 })
+  return NextResponse.json({ error: message, kind, finishReason }, { status: 500 })
 }
 
 /** 토큰이 없으면 즉시 401. 본문은 읽지 않는다. */

@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       kind: null,
+      finishReason: null,
       message: '연결됐습니다.',
       repliedModel: result.model ?? model,
       redirected,
@@ -70,18 +71,28 @@ export async function POST(req: NextRequest) {
     // ★ providerError()를 재 쓰지 않습니다 ★
     // 그 함수는 500을 돌려주고 로그를 남기는데, 시험은 **실패가 정상 결과**입니다.
     // 200으로 kind를 담아 돌려야 화면이 "실패 사유"를 정상적인 흐름으로 보여줍니다.
-    const { kind, message, provider: p, status } = describeError(err)
+    const { kind, message, provider: p, status, finishReason } = describeError(err)
 
     // 원본은 브라우저로 안 갑니다 (키 지문). 종류·provider·상태 코드만 남깁니다.
     console.error(
       `[models/test] 시험 실패: kind=${kind}` +
-      `${p ? ` provider=${p}` : ''}${status ? ` status=${status}` : ''}`
+      `${p ? ` provider=${p}` : ''}${status ? ` status=${status}` : ''}` +
+      `${finishReason ? ` finish_reason=${finishReason}` : ''}`
     )
 
     return NextResponse.json({
       ok: false,
       kind,
       message,
+      /**
+       * ★ kind가 'empty'일 때 무엇을 해야 하는지가 여기서 갈립니다 ★
+       *   length — 출력 상한이 모자랐습니다. 이 모델의 maxTokens를 올리면 됩니다.
+       *   그 외   — 상한 문제가 아닙니다. 값을 올려도 똑같은 결과입니다.
+       *
+       * 이 값이 없으면 화면에는 "빈 응답"이라는 말만 남고,
+       * 사용자가 무엇을 고쳐야 하는지 알 방법이 없습니다.
+       */
+      finishReason,
       repliedModel: null,
       redirected: false,
       usedTokens: 0,

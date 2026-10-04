@@ -107,6 +107,12 @@ type ProviderResult = {
   /** 실패했을 때의 분류 (empty/quota/auth 등). 성공이면 null */
   kind: string | null
   status: number | null
+  /**
+   * provider가 본문을 못 채운 이유. kind가 'empty'일 때만 값이 있고,
+   * 그 값이 "상한 부족(length)"인지 "다른 문제"인지 갈라 줍니다.
+   * lib/api.ts의 describeError()가 꺼냅니다 — 여기서 새로 만들지 않습니다.
+   */
+  finishReason: string | null
   ms: number
   /** 저장에 쓸 실제 응답 본문. 실패하면 빈 문자열 */
   reply: string
@@ -135,7 +141,16 @@ async function pingProvider(provider: Provider): Promise<ProviderResult> {
   if (!model) {
     // 모델 목록이 비었다는 사실입니다. 기본값을 지어내지 않습니다.
     console.error(`[keepalive] ${provider}: 등록된 모델이 없습니다 (모델 관리 확인)`)
-    return { provider, model: '', ok: false, kind: 'no-model', status: null, ms: ms(), reply: '' }
+    return {
+      provider,
+      model: '',
+      ok: false,
+      kind: 'no-model',
+      status: null,
+      finishReason: null,
+      ms: ms(),
+      reply: '',
+    }
   }
 
   try {
@@ -159,16 +174,23 @@ async function pingProvider(provider: Provider): Promise<ProviderResult> {
       ok: true,
       kind: null,
       status: 200,
+      finishReason: null,
       ms: ms(),
       reply: result.content ?? '',
     }
   } catch (err: unknown) {
-    const { kind, provider: p, status } = describeError(err)
+    const { kind, provider: p, status, finishReason } = describeError(err)
     console.error(
       `[keepalive] ${provider} 실패: kind=${kind}` +
-        `${p ? ` provider=${p}` : ''}${status ? ` status=${status}` : ''}`
+        `${p ? ` provider=${p}` : ''}${status ? ` status=${status}` : ''}` +
+        `${finishReason ? ` finish_reason=${finishReason}` : ''}`
     )
-    return { provider, model, ok: false, kind, status, ms: ms(), reply: '' }
+    // ★ finish_reason을 결과에 싣습니다 ★
+    // 'empty'만 보면 "무엇을 고쳐야 하나"를 알 수 없습니다.
+    //   length — 이 경로의 출력 상한(512)이 작았습니다. 채팅은 2000을 받아
+    //           정상일 수 있으므로, 이것만 보고 모델이 죽었다고 결론내리지 마세요.
+    //   그 외   — 상한 문제가 아닙니다.
+    return { provider, model, ok: false, kind, status, finishReason, ms: ms(), reply: '' }
   }
 }
 
@@ -316,6 +338,7 @@ export async function GET(req: NextRequest) {
     ok: pinged.ok,
     kind: pinged.kind,
     status: pinged.status,
+    finishReason: pinged.finishReason,
     ms: pinged.ms,
     saved: stored.saved,
     readBack: stored.readBack,
