@@ -58,6 +58,14 @@ export default function ChatPage() {
    * 대화창을 반 이하로 밀어냈습니다. 그래서 접힌 상태로 시작합니다.
    */
   const [panelOpen, setPanelOpen] = useState<boolean>(false)
+  /**
+   * "새 대화"를 누를 때마다 올라갑니다.
+   *
+   * 목록이 4개 단위로 페이지를 보여주므로, 이게 없으면 사용자가 3페이지에
+   * 있는 상태에서 새 대화를 만들고도 그것을 보지 못합니다 — 만들었는데
+   * 안 보이면 저장이 안 된 것처럼 읽힙니다.
+   */
+  const [listReset, setListReset] = useState<number>(0)
 
   const {
     enabled: savingEnabled,
@@ -136,6 +144,7 @@ export default function ChatPage() {
     setTrimmedNotice('')
     setError('')
     setSaveWarning('')
+    setListReset((n) => n + 1)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -315,6 +324,7 @@ export default function ChatPage() {
                 onNew={() => void handleNewConversation()}
                 onDelete={(id) => void removeConversation(id)}
                 emptyHint="저장된 대화가 없습니다. 첫 메시지를 보내면 만들어집니다."
+                resetSignal={listReset}
               />
 
               <ModelPicker

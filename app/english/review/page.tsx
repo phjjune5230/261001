@@ -70,11 +70,15 @@ export default function EnglishReviewPage() {
 
   return (
     <main className="min-h-screen bg-page text-ink flex flex-col">
-      <header className="border-b border-line px-6 py-4 flex items-center gap-4">
-        <Link href="/" className="text-meta text-ink-muted hover:text-ink transition-colors">
+      {/* 채팅·영어 화면과 같은 헤더 규칙 (모바일 한 줄) */}
+      <header className="border-b border-line px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3 sm:gap-4">
+        <Link
+          href="/"
+          className="text-meta text-ink-muted hover:text-ink transition-colors shrink-0"
+        >
           ← 홈
         </Link>
-        <h1 className="font-display text-title">복습</h1>
+        <h1 className="font-display text-sub sm:text-title whitespace-nowrap">복습</h1>
       </header>
 
       <div className="flex-1 w-full max-w-3xl mx-auto p-6 flex flex-col gap-6">

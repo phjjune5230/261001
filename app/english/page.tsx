@@ -27,7 +27,23 @@ import {
 
 type Entry =
   | { kind: 'user'; text: string }
-  | { kind: 'assistant'; turn: LessonTurn }
+  | {
+      kind: 'assistant'
+      turn: LessonTurn
+      /**
+       * ★ 이 턴을 만들어낸 provider·model ★
+       *
+       * 채팅과 같은 이유입니다. 화면에 있는 선택은 "지금 고른 것"이지
+       * 이 턴을 만든 것이 아닙니다. 대화를 오가며 모델을 바꾸면 라벨이
+       * 거짓말을 하게 됩니다.
+       *
+       * meta에는 turn이 통째로 들어가고, 이 둘은 같은 자리에 덧붙여 씁니다.
+       * metaToTurn가 모르는 키는 그대로 통과시키므로 LessonTurn 모양은
+       * 그대로입니다 (lib/lesson.ts).
+       */
+      provider?: string
+      model?: string
+    }
 
 /** 빈 턴. 복원 실패와 파싱 실패가 모두 여기로 떨어집니다. */
 function emptyTurn(content: string): LessonTurn {
@@ -102,6 +118,10 @@ export default function EnglishPage() {
   const [finished, setFinished] = useState<boolean>(false)
   // 채팅과 같다 — 저장이 실패했을 때만 경고합니다.
   const [saveWarning, setSaveWarning] = useState<string>('')
+  // 채팅과 같다 — 기본은 접힘. 이 앱의 주된 행동은 발화입니다.
+  const [panelOpen, setPanelOpen] = useState<boolean>(false)
+  // 채팅과 같다 — 새 세션을 만들면 목록 1페이지로 되돌립니다.
+  const [listReset, setListReset] = useState<number>(0)
 
   const {
     enabled: savingEnabled,
@@ -264,15 +284,16 @@ export default function EnglishPage() {
         summary: data.summary ?? null,
       }
 
-      setEntries([...withUser, { kind: 'assistant', turn }])
+      setEntries([...withUser, { kind: 'assistant', turn, provider: data.provider || provider, model: data.model || activeModel }])
 
       // 턴을 통째로 meta에 넣습니다. content엔 히스토리 텍스트를 — 화면에는
       // turn.steps로 렌더하고, 모델에게는 압축된 형태로 보냅니다.
-      const saved = await saveTurn(
-        text,
-        turnToHistoryText(turn),
-        turn as unknown as Record<string, unknown>
-      )
+      // 라벨용 provider/model을 같은 자리에 덧붙입니다 (Entry 타입 참고).
+      const saved = await saveTurn(text, turnToHistoryText(turn), {
+        ...(turn as unknown as Record<string, unknown>),
+        provider: data.provider || provider,
+        model: data.model || activeModel,
+      })
       setSaveWarning(saved ? '' : '이 세션은 저장되지 않았습니다. Supabase 연결을 확인하세요.')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.')
@@ -338,7 +359,10 @@ export default function EnglishPage() {
         summary: data.summary ?? null,
       }
 
-      setEntries([...entries, { kind: 'assistant', turn }])
+      setEntries([
+        ...entries,
+        { kind: 'assistant', turn, provider: data.provider || provider, model: data.model || activeModel },
+      ])
       setFinished(true)
 
       // "마무리"라는 발화가 실제로 있었던 것으로 저장합니다. 대화를 다시 열었을 때
@@ -346,11 +370,11 @@ export default function EnglishPage() {
       // ★ 저장이 끝난 대화의 id를 그대로 받습니다 ★
       // 첫 세션에서는 대화가 이 안에서 막 만들어집니다. 그래서 activeId를 읽으면
       // 아직 갱신되지 않은 null이 나와서 학습 기록이 저장되지 않습니다 (hooks/useConversations.ts).
-      const savedId = await saveTurn(
-        '마무리',
-        turnToHistoryText(turn),
-        turn as unknown as Record<string, unknown>
-      )
+      const savedId = await saveTurn('마무리', turnToHistoryText(turn), {
+        ...(turn as unknown as Record<string, unknown>),
+        provider: data.provider || provider,
+        model: data.model || activeModel,
+      })
 
       // ★ 학습 기록을 여기서 저장합니다 ★
       // 대화 저장과 별개입니다. 대화가 있어도 "내가 틀린 것"이 남지 않으면
@@ -388,11 +412,20 @@ export default function EnglishPage() {
 
   const handleSelectConversation = async (id: string) => {
     const rows = await openConversation(id)
-    const restored: Entry[] = rows.map((r) =>
-      r.role === 'user'
-        ? { kind: 'user', text: r.content }
-        : { kind: 'assistant', turn: metaToTurn(r.meta, r.content) }
-    )
+    const restored: Entry[] = rows.map((r) => {
+      if (r.role === 'user') return { kind: 'user' as const, text: r.content }
+      // 라벨용 provider/model은 meta에서 되읽습니다 (Entry 타입 참고).
+      // 값이 없는 옛 턴은 라벨에서 뺍니다 — 지어내느라 채우는 것보다
+      // "모델 없음"이 정직합니다. 채팅 화면과 달리 영어 화면은
+      // 대화 설정을 대신 쓰지 않습니다. 여기선 그게 틀린 답이 될 수 있습니다.
+      const meta = r.meta as { provider?: unknown; model?: unknown } | null
+      return {
+        kind: 'assistant' as const,
+        turn: metaToTurn(r.meta, r.content),
+        provider: typeof meta?.provider === 'string' ? meta.provider : undefined,
+        model: typeof meta?.model === 'string' ? meta.model : undefined,
+      }
+    })
     setEntries(restored)
     // 세션을 다시 열면 마무리는 이미 끝난 상태입니다. 요약 턴이 있으면 확실합니다.
     setFinished(restored.some((e) => e.kind === 'assistant' && e.turn.summary !== null))
@@ -406,16 +439,29 @@ export default function EnglishPage() {
     setFinished(false)
     setError('')
     setSaveWarning('')
+    setListReset((n) => n + 1)
   }
 
   return (
     <main className="min-h-screen bg-page text-ink flex flex-col">
-      <header className="border-b border-line px-6 py-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-meta text-ink-muted hover:text-ink transition-colors">
+      {/*
+        Header — 채팅 화면과 같은 규칙입니다 (모바일에서 한 줄).
+
+        ★ 모델명은 모바일에서 숨깁니다 ★
+        채팅은 좌우에 버튼이 없지만 여기는 "복습"과 "새 세션" 두 개가 있습니다.
+        버튼 두 개 + 모델명은 좁은 화면에서 한 줄이 되지 않습니다.
+        모델명은 설정 칸 안에 그대로 있고 헤더는 덜 중요한 것이 되도록,
+        모바일에서는 숨기고 sm 이상에서만 보입니다.
+      */}
+      <header className="border-b border-line px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0 min-w-0">
+          <Link
+            href="/"
+            className="text-meta text-ink-muted hover:text-ink transition-colors shrink-0"
+          >
             ← 홈
           </Link>
-          <h1 className="font-display text-title">영어 학습</h1>
+          <h1 className="font-display text-sub sm:text-title whitespace-nowrap">영어 학습</h1>
           {/*
             ★ 여기에 단계 배지가 없습니다 ★
             예전엔 PHASE_LABEL[phase]가 헤더에 떴습니다. 그 값은 프롬프트가
@@ -424,13 +470,14 @@ export default function EnglishPage() {
             (handleFinish). 배지를 남겨 두면 재작업의 목적이 사라집니다.
           */}
         </div>
-        <div className="flex items-center gap-3 text-meta text-ink-muted">
-          <span className="hidden md:inline">
-            활성 모델: <span className="font-mono text-ink">{activeModel || '미설정'}</span>
+        <div className="flex items-center gap-2 sm:gap-3 text-meta text-ink-muted min-w-0">
+          <span className="hidden md:inline shrink-0">
+            활성 모델:{' '}
+            <span className="font-mono text-ink">{activeModel || '미설정'}</span>
           </span>
           <Link
             href="/english/review"
-            className="border border-line rounded-md bg-surface-1 shadow-edge px-3 py-1.5 text-ink-muted hover:bg-surface-3 hover:text-ink transition-colors"
+            className="border border-line rounded-md bg-surface-1 shadow-edge px-2 sm:px-3 py-1.5 text-ink-muted hover:bg-surface-3 hover:text-ink transition-colors shrink-0"
           >
             복습
           </Link>
@@ -438,7 +485,7 @@ export default function EnglishPage() {
             type="button"
             onClick={() => void startOver()}
             disabled={entries.length === 0}
-            className="border border-line rounded-md bg-surface-1 shadow-edge px-3 py-1.5 text-ink-muted hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-surface-1 disabled:hover:text-ink-muted transition-colors"
+            className="border border-line rounded-md bg-surface-1 shadow-edge px-2 sm:px-3 py-1.5 text-ink-muted hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-surface-1 disabled:hover:text-ink-muted transition-colors shrink-0"
           >
             새 세션
           </button>
@@ -446,71 +493,99 @@ export default function EnglishPage() {
       </header>
 
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto">
-        <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-line p-6 flex flex-col gap-6">
-          {/*
-            수준·목표 선택 UI를 걷어냈습니다.
-            이미 아는 걸 다시 묻지 않습니다 (docs/10-english-guide.md §2).
-            값은 서버 상수로 들어 있습니다 (lib/lesson.ts의 LEARNER_BASELINE).
-            대신 "무엇을 연습할지"만 고릅니다 — 선택지가 되돌 제약이 되지
-            않도록 직접 입력을 항상 함께 둡니다.
-          */}
-          <div>
-            <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
-              오늘 연습할 상황
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {SCENARIOS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => {
-                    setScenario(s.id)
-                    setCustomScenario('')
-                  }}
-                  className={`px-2 py-1.5 text-meta rounded-md border transition-colors ${
-                    s.id === scenario && !customScenario.trim()
-                      ? 'border-accent/40 bg-accent/5 text-ink'
-                      : 'border-line bg-surface-1 text-ink-muted hover:border-line-strong hover:text-ink'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
+        {/*
+          Sidebar — 채팅 화면과 같은 구조. 기본은 접힘.
+
+          상황 선택 · 대화 목록 · 모델 선택 세 덩어리가 채팅창 위를 계속
+          밀어냈습니다. 이 화면의 주된 행동은 영어로 말해 보는 것이고,
+          세 덩어리는 그 옆에서 자리를 차지할 뿐이었습니다.
+        */}
+        <aside className="w-full md:w-80 shrink-0 border-b md:border-b-0 md:border-r border-line">
+          <button
+            type="button"
+            onClick={() => setPanelOpen((v) => !v)}
+            aria-expanded={panelOpen}
+            className="w-full flex items-center justify-between px-4 sm:px-6 md:px-4 py-3 text-meta text-ink-muted hover:text-ink transition-colors"
+          >
+            <span>
+              설정
+              <span className="text-ink-faint"> · 상황 · 대화 · 모델</span>
+            </span>
+            <Icon
+              name="chevron"
+              size={14}
+              strokeWidth={2}
+              className={`shrink-0 transition-transform ${panelOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {panelOpen && (
+            <div className="p-4 sm:p-6 pt-0 md:pt-0 flex flex-col gap-6">
+              {/*
+                수준·목표 선택 UI를 걷어냈습니다.
+                이미 아는 걸 다시 묻지 않습니다 (docs/10-english-guide.md §2).
+                값은 서버 상수로 들어 있습니다 (lib/lesson.ts의 LEARNER_BASELINE).
+                대신 "무엇을 연습할지"만 고릅니다 — 선택지가 되돌 제약이 되지
+                않도록 직접 입력을 항상 함께 둡니다.
+              */}
+              <div>
+                <label className="block font-mono text-label tracking-label uppercase text-ink-faint mb-2">
+                  오늘 연습할 상황
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {SCENARIOS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        setScenario(s.id)
+                        setCustomScenario('')
+                      }}
+                      className={`px-2 py-1.5 text-meta rounded-md border transition-colors ${
+                        s.id === scenario && !customScenario.trim()
+                          ? 'border-accent/40 bg-accent/5 text-ink'
+                          : 'border-line bg-surface-1 text-ink-muted hover:border-line-strong hover:text-ink'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={customScenario}
+                  onChange={(e) => setCustomScenario(e.target.value)}
+                  placeholder="직접 입력 — 실제로 만날 상황"
+                  className="mt-2 w-full bg-surface-2 border border-line rounded-md px-3 py-2 text-meta text-ink shadow-edge outline-none focus:border-line-strong transition-colors"
+                />
+                <p className="mt-2 text-meta leading-relaxed text-ink-faint">
+                  고르지 않아도 됩니다. 상황 없이 그냥 대화해도 됩니다.
+                </p>
+              </div>
+
+              <ConversationList
+                conversations={conversations}
+                activeId={activeId}
+                enabled={savingEnabled}
+                loading={loadingList}
+                onSelect={(id) => void handleSelectConversation(id)}
+                onNew={() => void startOver()}
+                onDelete={(id) => void removeConversation(id)}
+                emptyHint="저장된 세션이 없습니다. 첫 발화를 보내면 만들어집니다."
+                resetSignal={listReset}
+              />
+
+              <ModelPicker
+                provider={provider}
+                onProviderChange={handleProviderChange}
+                model={model}
+                onModelChange={setModel}
+                customModel={customModel}
+                onCustomModelChange={setCustomModel}
+                registry={registry}
+              />
             </div>
-            <input
-              type="text"
-              value={customScenario}
-              onChange={(e) => setCustomScenario(e.target.value)}
-              placeholder="직접 입력 — 실제로 만날 상황"
-              className="mt-2 w-full bg-surface-2 border border-line rounded-md px-3 py-2 text-meta text-ink shadow-edge outline-none focus:border-line-strong transition-colors"
-            />
-            <p className="mt-2 text-meta leading-relaxed text-ink-faint">
-              고르지 않아도 됩니다. 상황 없이 그냥 대화해도 됩니다.
-            </p>
-          </div>
-
-          <div className="border-t border-line pt-6 flex flex-col gap-6">
-            <ConversationList
-              conversations={conversations}
-              activeId={activeId}
-              enabled={savingEnabled}
-              loading={loadingList}
-              onSelect={(id) => void handleSelectConversation(id)}
-              onNew={() => void startOver()}
-              onDelete={(id) => void removeConversation(id)}
-              emptyHint="저장된 세션이 없습니다. 첫 발화를 보내면 만들어집니다."
-            />
-
-            <ModelPicker
-              provider={provider}
-              onProviderChange={handleProviderChange}
-              model={model}
-              onModelChange={setModel}
-              customModel={customModel}
-              onCustomModelChange={setCustomModel}
-              registry={registry}
-            />
-          </div>
+          )}
         </aside>
 
         <section className="flex-1 flex flex-col h-[calc(100vh-65px)] md:h-auto">
@@ -546,10 +621,23 @@ export default function EnglishPage() {
                   </div>
                 ) : (
                   <div key={idx} className="flex flex-col gap-1.5 self-start items-start">
-                    <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint">
+                    {/*
+                      ★ "튜터"만 쓰면 어떤 모델이 답했는지 알 수 없습니다 ★
+                      채팅 화면과 같은 형식입니다. provider와 모델명을 함께 적고,
+                      긴 모델 ID는 잘라 말풍선 폭을 침범하지 않게 합니다.
+
+                      옛 턴에는 이 값이 없습니다. 그때는 라벨에서 뺍니다 —
+                      지어내느라 채우는 것보다 "모델 없음"이 정직합니다.
+                    */}
+                    <span
+                      className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint min-w-0 max-w-full"
+                      title={entry.provider ? `튜터: ${entry.provider} / ${entry.model}` : undefined}
+                    >
                       {/* 강조색 두 번째 지점 (채팅 화면의 AI 점과 같은 역할) */}
-                      <i className="w-1 h-1 rounded-full bg-accent" aria-hidden="true" />
-                      튜터
+                      <i className="w-1 h-1 rounded-full bg-accent shrink-0" aria-hidden="true" />
+                      <span className="truncate">
+                        {entry.provider ? `튜터: ${entry.provider} / ${entry.model}` : '튜터'}
+                      </span>
                     </span>
 
                     {entry.turn.content && (
@@ -602,9 +690,11 @@ export default function EnglishPage() {
 
             {loading && (
               <div className="flex flex-col gap-1.5 self-start items-start">
-                <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint">
-                  <i className="w-1 h-1 rounded-full bg-accent" aria-hidden="true" />
-                  튜터 응답 중
+                <span className="flex items-center gap-1.5 font-mono text-label tracking-label uppercase text-ink-faint min-w-0 max-w-full">
+                  <i className="w-1 h-1 rounded-full bg-accent shrink-0" aria-hidden="true" />
+                  <span className="truncate">
+                    튜터 응답 중 · {provider} / {activeModel || '미설정'}
+                  </span>
                 </span>
                 <div className="rounded-lg px-4 py-3 text-body bg-bubble-them border border-line shadow-edge text-ink-faint">
                   생각 중...
