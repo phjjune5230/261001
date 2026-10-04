@@ -156,7 +156,14 @@ export async function POST(req: NextRequest) {
     const approxTokens = context.reduce((sum, m) => sum + estimateTokens(m.content || ''), 0)
     console.log(
       `[chat] ${messages.length} → ${plan.context.length} 메시지` +
-      `${dropped > 0 ? ` (${dropped}개 압축)` : ''}` +
+      // ★ 두 개수를 합쳐 쓰면 안 됩니다 ★
+      // 예전에는 `(${dropped}개 압축)` 하나만 썼는데, dropped는
+      // "전체 − 이번 턴 보낸 것"이라 **이미 요약이 덮은 구간까지** 한 번에 세어집니다.
+      // 그래서 매 턴 22개가 계속 압축되는 것처럼 보였습니다. 실제로는 요약이
+      // 만들어지고도 없었습니다 — "요약 갱신"이 없을 때가 그 경우입니다.
+      // (2026-10-04, 압축이 매 턴 돈다고 오해)
+      `${plan.covered > 0 ? ` (요약이 앞 ${plan.covered}개를 덮음` : ''}` +
+      `${dropped > 0 ? `${plan.covered > 0 ? ',' : ' ('}이번에 버린 ${dropped}개)` : ')'}` +
       `${compacted ? ', 요약 갱신' : ''}` +
       `${summary ? `, 요약 ${estimateTokens(summary)} 토큰 포함` : ''}` +
       `, 입력 약 ${approxTokens + estimateTokens(system)} (예산 ${budget}, ` +
