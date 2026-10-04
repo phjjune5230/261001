@@ -11,7 +11,7 @@
 //  RLS는 정책이 하나도 없으면 전부 거부하므로 policy 를 지우면 닫힙니다.
 // ─────────────────────────────────────────────
 
-import { SUPABASE_URL, ANON_KEY } from './config.js'
+import { SUPABASE_URL, PUBLISHABLE_KEY } from './config.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -36,8 +36,8 @@ async function rest(path, params = {}) {
 
   const res = await fetch(url, {
     headers: {
-      apikey: ANON_KEY,
-      Authorization: `Bearer ${ANON_KEY}`,
+      apikey: PUBLISHABLE_KEY,
+      Authorization: `Bearer ${PUBLISHABLE_KEY}`,
       Accept: 'application/json',
     },
   })
@@ -315,11 +315,11 @@ function main() {
   setupSearch()
   $('refresh').addEventListener('click', refresh)
 
-  if (!SUPABASE_URL || !ANON_KEY) {
+  if (!SUPABASE_URL || !PUBLISHABLE_KEY) {
     showFatal(
       '설정이 아직 없습니다. <code>viewer/config.js</code>를 열어 ' +
-        '<code>SUPABASE_URL</code>과 <code>ANON_KEY</code>를 채우고 다시 빌드하세요.' +
-        '<br />anon 키만 넣으세요. service_role 키를 넣으면 대화가 통째로 노출됩니다.'
+        '<code>SUPABASE_URL</code>과 <code>PUBLISHABLE_KEY</code>를 채우고 다시 빌드하세요.' +
+        '<br />publishable 키만 넣으세요. secret(service_role) 키를 넣으면 대화가 통째로 노출됩니다.'
     )
     $('list').replaceChildren()
     return

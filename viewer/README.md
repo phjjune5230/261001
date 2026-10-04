@@ -30,9 +30,14 @@ Supabase 대시보드 → **SQL Editor** → New query →
 | | 값 | 어디서 |
 |---|---|---|
 | `SUPABASE_URL` | `https://xxxx.supabase.co` | Project Settings → API |
-| `ANON_KEY` | anon "public" 키 | 같은 화면의 API Keys 목록 |
+| `PUBLISHABLE_KEY` | publishable 키 (옛 이름 anon) | 같은 화면의 API Keys 목록 |
 
-> **anon 키만 넣으세요.** 목록의 `service_role` 키가 아닙니다.
+> **구별법** — 앞 15글자만 보세요.
+> `sb_publishable_…` 가 맞고, `sb_secret_…` 는 절대 안 됩니다.
+> `eyJ…` 로 시작하는 옛 키라면 목록에서 **`anon public` 행**을 쓰세요.
+> 같은 자리에 있는 `service_role` 행이 아닙니다.
+
+> **publishable 키만 넣으세요.** 목록의 `secret` / `service_role` 키가 아닙니다.
 > service_role은 RLS를 우회하므로, 이 파일에 한 줄만 실려도
 > 대화 전체를 읽고 지울 수 있는 키가 정적 파일에 박힙니다.
 
