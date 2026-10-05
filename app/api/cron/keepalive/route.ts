@@ -357,6 +357,26 @@ export async function GET(req: NextRequest) {
    * 말합니다. 상태 코드로 실패를 알리면 Vercel이 재시도할 수 있어서
    * 하루에 몇 번씩 중복 호출되며, 그만큼 provider를 더 때립니다.
    */
+  /*
+   * ★ 한 줄로 적는 이유 ★
+   * Vercel 요청 로그에는 경로와 상태 코드만 남고 **본문은 찍히지 않습니다.**
+   * "크론이 붙었나"는 200 하나로 답할 수 있지만, provider 셋 중 뭐가 죽었는지는
+   * 이 줄이 말해주지 않으면 한 달 동안 아무도 모릅니다. 하루 한 번 도는
+   * 작업이라 지금 안 남기면 다음에 볼 사람은 왜 봤는지조차 알 수 없습니다.
+   */
+  const each = summary
+    .map((r) => {
+      const ping = r.ok ? 'ok' : `실패:${r.kind ?? 'unknown'}`
+      const save = r.saved ? '저장' : '저장실패'
+      const read = r.readBack ? '읽기' : '읽기실패'
+      return `${r.provider}=${ping}/${save}/${read}`
+    })
+    .join('  ')
+
+  console.log(
+    `[keepalive] ${failed.length === 0 ? '모두 통과' : `실패: ${failed.join(',')}`} — ${each} (${Date.now() - startedAt}ms)`
+  )
+
   return NextResponse.json({
     ok: failed.length === 0,
     ranAt: new Date(startedAt).toISOString(),
