@@ -99,6 +99,16 @@ const PROBE_PROMPT = 'ping'
  */
 const STORED_REPLY_MAX = 500
 
+/**
+ * keepalive_runs 이력을 얼마나 오래 남길지.
+ *
+ * 하루에 한 줄입니다. 90일이면 90행이고, 한 행이 수백 바이트라서
+ * 무시할 수 있는 크기입니다. 그래도 "적히기만 하고 지워지지 않는" 표를
+ * 두지 않으려고 상한을 둡니다. 90일이면 provider 가 갑자기 죽어도
+ * "언제부터 죽었는지"를 끝까지 찾을 수 있는 창입니다.
+ */
+const PRUNE_AFTER_MS = 90 * 24 * 60 * 60 * 1000
+
 /** provider 하나를 돌린 결과. */
 type ProviderResult = {
   provider: Provider
@@ -288,6 +298,56 @@ async function roundTrip(provider: Provider, model: string, reply: string): Prom
   }
 }
 
+/*
+ * 실행 결과를 표에 남깁니다.
+ *
+ * ★ 왜 Vercel 로그로 안 되나 ★
+ * Hobby 요금제의 런타임 로그 보관 기간은 1시간입니다 (Pro는 1일, 30일은 Pro 전용
+ * Observability Plus). 하루에 한 번 도는 작업의 기록이 한 시간 뒤 사라집니다.
+ * Log Drains 도 Hobby 에는 없습니다. Vercel 안에는 오래 둘 자리가 없습니다.
+ *
+ * 그래서 자기 DB에 씁니다. 이 라우트는 service_role 로 접속하므로 RLS 를 우회해
+ * 쓰기가 됩니다. anon 정책은 추가하지 않았습니다 — 이 표가 브라우저에 보이면
+ * provider·모델명이 그대로 노출됩니다.
+ *
+ * ★ 실패해도 조용히 넘어갑니다 ★
+ * 표가 아직 없을 수도 있습니다(스키마를 실행하지 않았을 수 있음).
+ * 그렇다고 provider 검사가 끝난 실행을 실패로 기록하지 않습니다.
+ * 여기서 실패하면 console.error 만 남기고 원래 결과를 그대로 돌려줍니다.
+ */
+async function recordRun(entry: {
+  ok: boolean
+  failed: string[]
+  totalMs: number
+  results: unknown
+}): Promise<void> {
+  try {
+    const db = getServerSupabase()
+    const { error } = await db.from('keepalive_runs').insert({
+      ok: entry.ok,
+      failed: entry.failed,
+      total_ms: entry.totalMs,
+      results: entry.results,
+    })
+    if (error) throw new Error(error.message)
+
+    // 오래된 것은 지웁니다. 하루 한 줄이라 90일이면 90행뿐이지만,
+    // "적히기만 하고 지워지지 않는" 표는 어느새 무거워집니다.
+    const { error: pruneErr } = await db
+      .from('keepalive_runs')
+      .delete()
+      .lt('ran_at', new Date(Date.now() - PRUNE_AFTER_MS).toISOString())
+    if (pruneErr) {
+      console.error('[keepalive] 오래된 이력 정리 실패:', pruneErr)
+    }
+  } catch (err: unknown) {
+    console.error(
+      '[keepalive] 이력 기록 실패 — supabase/add-keepalive-log.sql 을 실행했는지 확인하세요.',
+      err
+    )
+  }
+}
+
 /** GET /api/cron/keepalive — Vercel Cron이 하루 한 번 부릅니다. */
 export async function GET(req: NextRequest) {
   /**
@@ -349,6 +409,16 @@ export async function GET(req: NextRequest) {
     .filter((r) => !r.ok || !r.saved || !r.readBack)
     .map((r) => r.provider)
 
+  const totalMs = Date.now() - startedAt
+
+  /*
+   * ★ 결과를 표에 남깁니다 (사용자 승인: 매일 INSERT, 90일 지난 행 자동 DELETE) ★
+   * 로그가 1시간뿐이므로 여기가 유일하게 남는 자리입니다.
+   * 실패해도 원래 결과는 그대로 돌려줍니다 — provider 검사가 끝난 실행을
+   * "이력 저장 실패"로 실패 처리하지 않습니다.
+   */
+  await recordRun({ ok: failed.length === 0, failed, totalMs, results: summary })
+
   /**
    * provider가 실패해도 200을 돌려줍니다.
    *
@@ -380,7 +450,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: failed.length === 0,
     ranAt: new Date(startedAt).toISOString(),
-    totalMs: Date.now() - startedAt,
+    totalMs,
     failed,
     results: summary,
   })
