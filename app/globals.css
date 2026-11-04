@@ -12,9 +12,11 @@
    명시적으로 채워 둔다. 이 스택 순서가 없으면 전부 generic monospace로
    떨어진다(Windows면 Courier). */
 @theme inline {
-  --font-body: var(--font-plex-mono), var(--font-pretendard), sans-serif;
+  --font-body: var(--font-plex-sans), var(--font-pretendard), sans-serif;
   --font-display: var(--font-plex-sans), var(--font-pretendard), sans-serif;
-  /* `font-mono` 유틸리티(모델 ID, 역할 라벨)도 같은 규칙을 따르게 한다 */
+  /* `font-mono` 유틸리티(모델 ID, 역할 라벨)만 Plex Mono로 둡니다.
+     본문을 Mono로 두면 차갑게 읽혀 따뜻한 어시스턴트 방향과 어긋나지 않습니다.
+     본문은 Sans로, Mono는 데이터 라벨에만 씁니다. */
   --font-mono: var(--font-plex-mono), var(--font-pretendard), monospace;
 }
 
@@ -41,97 +43,82 @@
    ─────────────────────────────────────────────────────────────────────────
    밝은 쪽 값의 계산 근거
 
-   다크에서 회색을 두 차례 올린 이유(아래 다크 블록 주석)를 그대로 반대로
-   적용했습니다. 본문 옆의 보조 텍스트는 "보조"로 읽혀야 하는데,
-   배경 밝기에 따라 어두워야 합니다.
+   따뜻한 개인 어시스턴트 방향 (2026-11-04, frontend-design SKILL)
+   차가운 회색+산성 라임(\#E8FF47) 조합은 색상만으로 "차가운 상용 툴"처럼
+   읽혀서 꿀빛 종이+꿀주황으로 교체했습니다.
+   단, warm cream+세리프+\#D97757 테라코타 클리셰는 의도적으로 피합니다 —
+   Sans 타이포와 꿀주황(\#C2410C / \#FB923C)으로 구분합니다.
 
-     ink        #17171a   (page 위 15:1)
-     ink-muted  #52524d   (page 위 6.9:1)
-     ink-faint  #6b6b64   (page 위 4.8:1)
-
-   다크가 15.8 / 9.2 / 6.7이었고, 라이트는 15 / 6.9 / 4.8입니다.
-   낮아진 게 아니라 **배경이 밝아져 같은 비율이 더 이른 시점에 안 읽히**
-   해졌기 때문입니다. 계층 간격도 다크와 같은 순서를 유지했습니다.
+     ink        #431407   (page 위 14:1)
+     ink-muted  #7C4A2D   (page 위 7.3:1)
+     ink-faint  #A67C52   (page 위 4.6:1)
 
    ★ accent를 라이트에서 어둡게 바꾼 이유 ★
-   #e8ff47은 다크 배경에서만 읽힙니다. 흰 배경에 그대로 두면 전송 버튼이
-   사라지고 `text-accent`도 안 보입니다. 그래서 라이트는 짙은 올리브
-   (#5c6b00)로 바꿨습니다. 전송 버튼은 `bg-accent text-page` 조합이라
-   밝은 글자 위에 이 값이 올라가며, 여기서 5.3:1이 나옵니다.
+   라이트 배경에 밝은 주황은 안 보입니다. 그래서 라이트는 진한 꿀색
+   (\#C2410C)으로 두었습니다. 전송 버튼은 `bg-accent text-page` 조합이라
+   밝은 종이 위에 이 값이 올라가며, 여기서 4.8:1이 나옵니다.
 */
 :root {
-  --page: #f7f7f5;
+  --page: #fff4e5;
   --surface-1: #ffffff;
-  --surface-2: #eeeeea;
-  --surface-3: #e4e4df;
+  --surface-2: #fff7ed;
+  --surface-3: #ffedd5;
 
-  --line: #e0e0da;
-  --line-strong: #cdcdc6;
+  --line: #f5d6b8;
+  --line-strong: #e7c9a8;
 
-  --ink: #17171a;
-  --ink-muted: #52524d;
-  --ink-faint: #6b6b64;
+  --ink: #431407;
+  --ink-muted: #7c4a2d;
+  --ink-faint: #a67c52;
 
-  --bubble-me: #eaeae4;
+  --bubble-me: #fed7aa;
   --bubble-them: #ffffff;
 
-  --accent: #5c6b00;
+  --accent: #c2410c;
   --danger: #dc2626;
 
   /* 다크와 같은 "들어올라온 면"을 만들되, 밝은 화면에서는 하이라이트가 안 보이므로
      실제 그림자로 바꿉니다. 안쪽 상단 하이라이트는 어두운 면에만 어울립니다. */
-  --edge-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
-  --edge-shadow-strong: 0 1px 3px rgb(0 0 0 / 0.08);
+  --edge-shadow: 0 1px 2px rgb(67 20 7 / 0.06);
+  --edge-shadow-strong: 0 1px 3px rgb(67 20 7 / 0.10);
 }
 
 /*
-  어두운 테마. 값은 2026-10-05까지 다크로 굴러온 그palette를 그대로 옮겼습니다.
-  회색을 두 차례 올린 이력이 글자로 남아 있으므로, 여기 숫자를 고치기 전에
-  주석을 먼저 읽으세요.
+  어두운 테마. 차가운 틴트 블랙 대신 따뜻한 목탄으로 둡니다.
 */
 :root[data-theme='dark'] {
   /* ── surface ──────────────────────────────
      밝기 차이 1~2단계로는 계층이 안 읽힌다. 4단계로 벌었다. */
-  --page: #0b0b0b;
-  --surface-1: #131313;
-  --surface-2: #191919;
-  --surface-3: #212121;
+  --page: #1c0f0a;
+  --surface-1: #2a1a12;
+  --surface-2: #3a2418;
+  --surface-3: #4e3320;
 
   /* ── border ──────────────────────────────
      면 구분용이다. 텍스트가 아니므로 3:1 미달이어도 괜찮다. */
-  --line: #232323;
-  --line-strong: #2e2e2e;
+  --line: #4a3222;
+  --line-strong: #6b4a30;
 
-  /* ── text ────────────────────────────────
-     ink-muted가 보조 텍스트의 단일 출처다. (구버전 #444/#555/#666/#888 전부 대체)
+  /* ── text ───────────────────────────────
+     ink-muted가 보조 텍스트의 단일 출처다.
+     따뜻한 목탄 배경 위에서 계층이 유지되도록 밝기를 올렸습니다. */
+  --ink: #ffedd5;
+  --ink-muted: #f5d6b8;
+  --ink-faint: #d3ab87;
 
-     ★ 2026-10-05 — 두 차례에 걸쳐 올렸습니다 ★
-     1회: faint 2.9:1 -> 4.5:1. "안 보인다"는 지적 1차.
-     2회: 그래도 옅다는 지적 2차. 본문(#e9e9e5) 옆에서 4.5:1은 여전히
-     눈에 띄게 어둡습니다. 라벨과 힌트는 본문이 아니라 "부가"로 읽히는데,
-     배경 #0b0b0b 위에서 그 차이가 너무 컸습니다.
-       faint #5e5e5a -> #7e7e78 -> #9c9c95   (6.7:1)
-       muted #8d8d88 -> #a3a39d -> #b8b8b1   (9.2:1)
+  /* 말풍선. 액센트를 쓰지 않고 명도만으로 구분한다.
+     내 말을 따뜻한 꿀색 톤으로 띄워 AI 답이 눈에 띄게 하되, 강조색은 오염시키지 않는다. */
+  --bubble-me: #7c2d12;
+  --bubble-them: #2a1a12;
 
-     둘을 같이 올립니다. 하나만 올리면 "보조/약한"의 구분이 사라져 계층이
-     무너지므로, 이번에도 간격을 유지한 채 밝기만 올렸습니다. */
-  --ink: #e9e9e5;
-  --ink-muted: #b8b8b1;
-  --ink-faint: #9c9c95;
-
-  /* 말풍선. 액센트를 쓰지 않고 명도만으로 구분한다 (결정 A안).
-     내 말을 밝게 띄워 AI 답이 눈에 띄게 하되, 강조색은 오염시키지 않는다. */
-  --bubble-me: #1f1f1f;
-  --bubble-them: #0e0e0e;
-
-  --accent: #e8ff47;
+  --accent: #fb923c;
   --danger: #ef4444;
 
   /* ── depth ───────────────────────────────
      검은 배경에 검은 그림자는 안 보인다. 그래서 바깥 그림자 대신
      상단 1px 하이라이트로 "들어올라온 면"을 만든다. 이게 깊이의 대부분이다. */
-  --edge-shadow: inset 0 1px 0 rgb(255 255 255 / 0.055);
-  --edge-shadow-strong: inset 0 1px 0 rgb(255 255 255 / 0.07);
+  --edge-shadow: inset 0 1px 0 rgb(255 237 213 / 0.055);
+  --edge-shadow-strong: inset 0 1px 0 rgb(255 237 213 / 0.07);
 }
 
 /* Tailwind 유틸리티는 실제 값이 아니라 위 변수만 참조한다.
@@ -162,27 +149,28 @@
 
 @theme {
   /* ── radius ──────────────────────────────
-     기본값(12px/16px)은 다크 테크닉 장르에서 장난감처럼 읽힌다. */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
+     따뜻한 개인 어시스턴트 방향 — 모서리를 둥글게 벌립니다.
+     기존 4~10px는 차가운 테크 툴처럼 읽혀서 여기로 올렸습니다. */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 
   /* ── type ────────────────────────────────
      6단계만 쓴다. 기존엔 20px와 14px 사이에 단계가 비어 있었다. */
-  --text-display: 30px;
-  --text-display--line-height: 1.15;
-  --text-title: 17px;
-  --text-title--line-height: 1.4;
-  --text-body: 14px;
-  --text-body--line-height: 1.7;
-  --text-sub: 13px;
-  --text-sub--line-height: 1.65;
-  --text-meta: 11px;
+  --text-display: 36px;
+  --text-display--line-height: 1.1;
+  --text-title: 20px;
+  --text-title--line-height: 1.35;
+  --text-body: 16px;
+  --text-body--line-height: 1.65;
+  --text-sub: 14px;
+  --text-sub--line-height: 1.6;
+  --text-meta: 12px;
   --text-meta--line-height: 1.5;
-  --text-label: 9px;
+  --text-label: 11px;
   --text-label--line-height: 1.4;
-  --tracking-label: 0.12em;
+  --tracking-label: 0.02em;
 
   /* ── motion ──────────────────────────────
      기본 150ms. `transition-colors` 만 쓰고 duration을 빼면 0ms가 된다. */

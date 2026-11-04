@@ -13,7 +13,7 @@
 --  SELECT 정책 하나씩만 더하는 것입니다.
 --
 --  ★ 본체 앱(Vercel)에 아무 영향이 없습니다 ★
---  first_app은 service_role로 접속합니다. service_role은 RLS를 우회하므로
+--  App은 service_role로 접속합니다. service_role은 RLS를 우회하므로
 --  정책이 늘어난 것을 통째로 통과합니다. 채팅·저장·삭제가 그대로 동작합니다.
 --  되돌릴 때도 본체가 멈추지 않습니다.
 --

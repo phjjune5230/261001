@@ -1,4 +1,4 @@
-# First App
+# App
 
 개인 실 사용 AI 어시스턴트. provider를 직접 골라 쓰고, 대화는 어디서든 이어갑니다.
 
@@ -6,26 +6,31 @@
 - **영어 학습** — `/english`
 - **운영 중** — https://261001-zeta.vercel.app (push 하면 자동 배포)
 
-> 이전 프로젝트 `C:\june\old`는 **컨셉만** 참고했고 코드는 가져오지 않았습니다.
+> push 는 이 폴더에서만 합니다. **2026-11-04에 원격 복구 완료** (`origin` upstream 설정됨).
+> 현재 reflog 일부가 손상되어 `git push --tags` 는 금지입니다. 첫 push 전에 `../GIT_PUSH.md` §0 를 읽으십시오.
+
+> 이 폴더는 June_APP의 사용자 앱입니다. DB 프로젝트의 시장 데이터와 독립적으로 동작합니다.
 
 ---
 
 ## 읽는 순서
 
-이 저장소에는 문서가 **3개** 있습니다. 위에서부터 읽으면 되고, 이게 전부입니다.
+먼저 이 README로 앱과 실행 방법을 파악하고, 필요한 주제의 문서를 이어서 읽습니다.
 
 | | 파일 | 답해 주는 것 |
 |---|---|---|
 | 1 | `README.md` (이 파일) | 이게 뭔가, 어떻게 도는지 |
-| 2 | [`docs/RULE.md`](docs/RULE.md) | 앞으로 뭘 지켜야 하나 — **코딩 전에 읽음** |
+| 2 | [`docs/RULE.md`](docs/RULE.md) | 구현 시 지킬 규칙 — 코딩 전에 읽음 |
 | 3 | [`docs/BACKLOG.md`](docs/BACKLOG.md) | 아직 안 된 것 |
+| 4 | [`docs/10-english-guide.md`](docs/10-english-guide.md) | 영어 학습 기능 안내 |
+| — | `AGENTS.md` | 저장소 작업 지침 |
 
 모델 목록은 문서가 아니라 **`lib/models.ts`** 한 곳에서만 봅니다. 모델을 추가·삭제할 때 손댈 곳은 저 파일 하나입니다.
 
 ## 빠른 시작
 
 ```powershell
-cd C:\june\first_app
+cd C:\june\June_APP\App
 Copy-Item .env.example .env.local
 npm install
 npm run dev
@@ -67,6 +72,25 @@ SUPABASE_SERVICE_ROLE_KEY=...
 Next.js 16 (App Router) · TypeScript strict · Tailwind v4 · React 19
 LLM 호출은 OpenRouter·Groq가 raw `fetch`, Gemini만 `@google/generative-ai` SDK를 씁니다 (Vercel AI SDK 미사용).
 대화 저장은 Supabase Postgres. 응답은 비스트리밍입니다 — 전체를 받고 나서 렌더링합니다.
+
+## 기능별 위치
+
+Next.js가 요구하는 라우팅 디렉터리 `app/`은 유지합니다. 화면은 기능별 경로로 나뉘어 있습니다.
+
+| 기능 | 화면·API | 공통 로직 |
+|---|---|---|
+| 채팅 | `app/chat/`, `app/api/chat/`, `app/api/conversations/` | `lib/llm.ts`, `lib/context.ts`, `lib/compaction.ts`, `components/ConversationList.tsx` |
+| 영어 학습 | `app/english/`, `app/api/english/` | `lib/lesson.ts`, `components/SpeakButton.tsx` |
+| 모델 설정 | `app/api/models/` | `components/ModelPicker.tsx`, `hooks/useModelRegistry.ts`, `lib/models.ts`, `lib/model-registry.ts` |
+| 로그인·접근 보호 | `app/api/auth/` | `components/AuthGate.tsx`, `lib/auth.ts`, `lib/auth-client.ts` |
+| App 데이터 저장 | `app/api/conversations/`, `app/api/english/records/` | `lib/db.ts`, `lib/db-server.ts`, `supabase/` |
+
+저장은 이 앱의 채팅·학습 기록을 위한 Supabase 저장소입니다. `June_APP/DB`의 시장 데이터 저장소와는 별도입니다.
+
+## 배포
+
+- URL: https://261001-zeta.vercel.app
+- push 하면 자동 배포됩니다. 원격 등록/손상 상태는 `../GIT_PUSH.md` 를 참조하십시오.
 
 ## 알려진 한계
 

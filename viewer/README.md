@@ -1,6 +1,6 @@
 # 과거 대화 뷰어 — 읽기 전용
 
-`first_app`의 대화 기록을 **보는 것만** 하는 정적 페이지입니다.
+`App`의 대화 기록을 **보는 것만** 하는 정적 페이지입니다.
 빌드가 없고 의존성이 없습니다. `app.js` 하나가 PostgREST를 fetch로 부릅니다.
 
 메인 앱은 그대로 Vercel에서 돌아갑니다. 이 폴더는 같은 저장소에 있으되
@@ -62,7 +62,7 @@ Netlify → **Add new site → Import an existing project** → 이 저장소 �
 ES 모듈이라 `file://` 로 열면 안 됩니다. 서버를 하나 띄우세요.
 
 ```powershell
-cd C:\june\first_app\viewer
+cd C:\june\June_APP\App\viewer
 npx serve .
 ```
 
