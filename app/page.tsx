@@ -20,6 +20,12 @@ const CARDS: Card[] = [
     desc: '모델을 골라 물어보세요. 다른 모델로 바꿔 답을 비교할 수도 있어요.',
   },
   {
+    href: '/chat2',
+    icon: 'chat',
+    title: '채팅2 (실험)',
+    desc: '기존 채팅과 같은 모델·키를 쓰지만 답이 스트리밍으로 흘러나와요. 대화 저장은 안 됩니다.',
+  },
+  {
     href: '/english',
     icon: 'book',
     title: '영어 공부',

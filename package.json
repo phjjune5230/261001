@@ -11,8 +11,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.111",
+    "@ai-sdk/openai-compatible": "^3.0.84",
+    "@ai-sdk/react": "^4.0.166",
     "@google/generative-ai": "^0.24.0",
     "@supabase/supabase-js": "^2.117.2",
+    "ai": "^7.0.162",
     "next": "^16.3.8",
     "react": "19.2.4",
     "react-dom": "19.2.4",
