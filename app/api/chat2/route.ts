@@ -42,10 +42,19 @@ export async function POST(req: NextRequest) {
     // 출력 상한은 기존 채팅과 같은 출처(모델 등록값)를 쓴다.
     const limits = await limitsForModel(provider, typeof model === 'string' ? model : undefined)
 
+    // 스트리밍으로 받은 AI 메시지는 reasoning/step-start 같은 파트가 섞여 있다.
+    // 그대로 convertToModelMessages에 넣으면 두 번째 턴부터 변환이 실패한다
+    // (첫 턴엔 이전 AI 메시지가 없어서 안 보인다). 화면에 쓰는 건 text뿐이므로
+    // text 파트만 남겨서 보낸다.
+    const textOnly = (messages as UIMessage[]).map((m) => ({
+      ...m,
+      parts: (m.parts ?? []).filter((p) => p.type === 'text'),
+    }))
+
     const result = streamText({
       model: resolveChatModel(provider, typeof model === 'string' ? model : undefined),
       system: system || undefined,
-      messages: await convertToModelMessages(messages as UIMessage[]),
+      messages: await convertToModelMessages(textOnly),
       maxOutputTokens: limits.maxTokens,
     })
 
