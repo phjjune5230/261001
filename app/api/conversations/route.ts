@@ -25,7 +25,7 @@ import { getServerSupabase, isDbConfigured } from '@/lib/db-server'
  *  "화면에서 안 골라 준 것"을 신뢰하지 마세요 — 라우트가 직접 조건을 적어야 합니다.
  */
 
-const KINDS = ['chat', 'english'] as const
+const KINDS = ['chat', 'english', 'chat2'] as const
 type Kind = (typeof KINDS)[number]
 
 function readKind(value: unknown): Kind | null {
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   if (!isDbConfigured()) return storageUnavailable()
 
   const kind = readKind(req.nextUrl.searchParams.get('kind'))
-  if (!kind) return badRequest('kind가 필요합니다. (chat 또는 english)')
+  if (!kind) return badRequest('kind가 필요합니다. (chat, english 또는 chat2)')
 
   try {
     const { data, error } = await getServerSupabase()
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const kind = readKind(body?.kind)
-    if (!kind) return badRequest('kind가 필요합니다. (chat 또는 english)')
+    if (!kind) return badRequest('kind가 필요합니다. (chat, english 또는 chat2)')
 
     const { data, error } = await getServerSupabase()
       .from('conversations')

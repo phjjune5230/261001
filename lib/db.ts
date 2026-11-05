@@ -85,7 +85,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 //  데이터 모델 — supabase/schema.sql과 1:1로 대응합니다
 // ============================================================================
 
-export type ConversationKind = 'chat' | 'english'
+export type ConversationKind = 'chat' | 'english' | 'chat2'
 
 export type Conversation = {
   id: string

@@ -34,7 +34,7 @@ create table if not exists public.conversations (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users(id) on delete cascade,
   kind        text not null default 'chat'
-              check (kind in ('chat', 'english')),
+              check (kind in ('chat', 'english', 'chat2')),
 
   -- 화면에 표시할 제목. 첫 메시지에서 자동으로 채웁니다.
   title       text not null default '새 대화',
